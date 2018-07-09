@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "bro.fullname" . }}-logstash-bro-pipeline
+  name: {{ template "ingest.fullname" . }}-logstash-bro-pipeline
 data:
   bro.conf: |
     input {

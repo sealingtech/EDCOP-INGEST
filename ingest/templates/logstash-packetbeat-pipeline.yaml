@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "packetbeat.fullname" . }}-logstash-packetbeat-pipeline
+  name: {{ template "ingest.fullname" . }}-logstash-packetbeat-pipeline
 data:
   packetbeat.conf: |
     input {
