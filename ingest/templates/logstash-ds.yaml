@@ -1,5 +1,5 @@
 apiVersion: extensions/v1beta1
-kind: Daemonset
+kind: DaemonSet
 metadata:
   name: {{ template "ingest.fullname" . }}-logstash
   namespace: default
@@ -42,48 +42,16 @@ spec:
         volumeMounts:
           - mountPath: /usr/share/logstash/config
             name: logstash-config
-          {{- if .Values.logstashConfig.features.syslog.enabled }}
           - mountPath: /usr/share/logstash/pipeline/
-            name: logstash-syslog-pipeline
-          {{- end }}
-          {{- if .Values.logstashConfig.features.packetbeat.enabled }}
-          - mountPath: /usr/share/logstash/pipeline/
-            name: logstash-packetbeat-pipeline
-          {{- end }}
-          {{- if .Values.logstashConfig.features.bro.enabled }}
-          - mountPath: /usr/share/logstash/pipeline/
-            name: logstash-bro-pipeline
-          {{- end }}
-          {{- if .Values.logstashConfig.features.suricata.enabled }}
-          - mountPath: /usr/share/logstash/pipeline/
-            name: logstash-suricata-pipeline
-          {{- end }}
+            name: logstash-pipelines
       volumes:
       - name: logstash-config
         configMap:
-          name: {{ template "ingest.fullname" . }}-logstash--config
-      {{- if .Values.logstashConfig.features.syslog.enabled }}
-      - name: logstash-syslog-pipeline
+          name: {{ template "ingest.fullname" . }}-logstash-config
+      - name: logstash-pipelines
         configMap:
-          name: {{ template "ingest.fullname" . }}-logstash-syslog-pipeline
-      {{- end }}
-      {{- if .Values.logstashConfig.features.packetbeat.enabled }}
-      - name: logstash-packetbeat-pipeline
-        configMap:
-          name: {{ template "ingest.fullname" . }}-logstash-packetbeat-pipeline
-      {{- end }}
-      {{- if .Values.logstashConfig.features.bro.enabled }}
-      - name: logstash-bro-pipeline
-        configMap:
-          name: {{ template "ingest.fullname" . }}-logstash-bro-pipeline
-      {{- end }}
-      {{- if .Values.logstashConfig.features.suricata.enabled }}
-      - name: logstash-suricata-pipeline
-        configMap:
-          name: {{ template "ingest.fullname" . }}-logstash-suricata-pipeline
-      {{- end }}
+          name: {{ template "ingest.fullname" . }}-logstash-pipelines
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       nodeSelector:
         ingest: "true"
-

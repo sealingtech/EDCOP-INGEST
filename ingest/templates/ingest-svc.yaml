@@ -11,8 +11,9 @@ spec:
     protocol: TCP
     port: 6379
     targetPort: 6379
-    {{- if .Values.redisConfig.external.enabled }}
+  {{- if .Values.redisConfig.external.enabled }}
     nodePort: {{ .Values.redisConfig.external.port }}
-    {{- end }}
+  type: NodePort
+  {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-redis

@@ -20,6 +20,7 @@ spec:
     protocol: UDP
     port: 5144
     nodePort: 30144
+  type: NodePort
   {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-logstash

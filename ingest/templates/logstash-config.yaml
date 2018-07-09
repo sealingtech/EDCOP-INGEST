@@ -7,8 +7,8 @@ data:
     ## JVM configuration
     # Xms represents the initial size of total heap space
     # Xmx represents the maximum size of total heap space
-    -Xms{{  .Values.logstashConfig.environment.initialJvmHeap }}
-    -Xmx{{  .Values.logstashConfig.environment.maxJvmHeap }}
+    -Xms{{ .Values.logstashConfig.resources.initialJvmHeap }}
+    -Xmx{{ .Values.logstashConfig.resources.maxJvmHeap }}
     ################################################################
     ## Expert settings
     ################################################################
@@ -91,15 +91,51 @@ data:
     # Default values for ommitted settings are read from the `logstash.yml` file.
     # When declaring multiple pipelines, each MUST have its own `pipeline.id`.
     #
-    # Example of two pipelines:
+    # Template of EDCOP pipelines:
     #
-    # - pipeline.id: test
-    #   pipeline.workers: 1
-    #   pipeline.batch.size: 1
-    #   config.string: "input { generator {} } filter { sleep { time => 1 } } output { stdout { codec => dots } }"
-    # - pipeline.id: another_test
-    #   queue.type: persisted
-    #   path.config: "/tmp/logstash/*.config"
+    #   # Be sure to add these settings into the values.yaml file!
+    #   - pipeline.id: $TOOL-NAME
+    #     pipeline.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineWorkers }}
+    #     pipeline.batch.size: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineBatchSize }}
+    #     pipeline.output.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineOutputWorkers }}
+    #    ...
+    #
+    ###########################################################################
+    
+    ############################ Defined pipelines ############################
+    {{- if .Values.logstashConfig.features.syslog.enabled }}
+    # Syslog pipeline
+    - pipeline.id: syslog
+      pipeline.workers: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineWorkers }}
+      pipeline.batch.size: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineBatchSize }}
+      pipeline.output.workers: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineOutputWorkers }}
+    {{- end }}
+    
+    {{- if .Values.logstashConfig.features.packetbeat.enabled }}
+    # Packetbeat pipeline
+    - pipeline.id: packetbeat
+      pipeline.workers: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineWorkers }}
+      pipeline.batch.size: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineBatchSize }}
+      pipeline.output.workers: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineOutputWorkers }}
+    {{- end }}
+    
+    {{- if .Values.logstashConfig.features.bro.enabled }}
+    # Bro pipeline
+    - pipeline.id: bro
+      pipeline.workers: {{ .Values.logstashConfig.features.bro.pipeline.pipelineWorkers }}
+      pipeline.batch.size: {{ .Values.logstashConfig.features.bro.pipeline.pipelineBatchSize }}
+      pipeline.output.workers: {{ .Values.logstashConfig.features.bro.pipeline.pipelineOutputWorkers }}
+    {{- end }}
+    
+    {{- if .Values.logstashConfig.features.suricata.enabled }}
+    # Suricata pipeline
+    - pipeline.id: suricata
+      pipeline.workers: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineWorkers }}
+      pipeline.batch.size: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineBatchSize }}
+      pipeline.output.workers: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineOutputWorkers }}
+    {{- end }}
+    
+    #################################### Options ###################################
     #
     # Available options:
     #
@@ -114,16 +150,20 @@ data:
     #
     #   # How many worker threads execute the Filters+Outputs stage of the pipeline
     #   pipeline.workers: 1 (actually defaults to number of CPUs)
-    pipeline.workers: {{  .Values.logstashConfig.environment.pipelineWorkers }}
     #
     #   # How many events to retrieve from inputs before sending to filters+workers
-    pipeline.batch.size: {{  .Values.logstashConfig.environment.pipelineBatchSize }}
     #
     #   # How long to wait before dispatching an undersized batch to filters+workers
     #   pipeline.batch.delay: 5
     #
+    #   # How many events to process at the same time
+    #   pipeline.batch.size: 150
+    #
     #   # How many workers should be used per output plugin instance
-    pipeline.output.workers:  {{  .Values.logstashConfig.environment.pipelineOutputWorkers }}
+    #   pipeline.workers: 2
+    #
+    #   # How many output workers should be used per output plugin instance
+    #   pipeline.output.workers: 2
     #
     #   # Internal queuing model, "memory" for legacy in-memory based queuing and
     #   # "persisted" for disk-based acked queueing. Defaults is memory

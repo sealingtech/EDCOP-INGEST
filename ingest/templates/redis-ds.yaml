@@ -1,5 +1,5 @@
 apiVersion: extensions/v1beta1
-kind: Daemonset
+kind: DaemonSet
 metadata:
   name: {{ template "ingest.fullname" . }}-redis
   namespace: default
@@ -30,11 +30,11 @@ spec:
           containerPort: 6379
         resources:
           requests:
-            cpu: {{ .Values.redisConfig.requests.cpu | quote }}
-            memory: {{ .Values.redisConfig.requests.memory | quote }}
+            cpu: {{ .Values.redisConfig.resources.requests.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.requests.memory | quote }}
           limits:
-            cpu: {{ .Values.redisConfig.limits.cpu | quote }}
-            memory: {{ .Values.redisConfig.limits.memory | quote }}
+            cpu: {{ .Values.redisConfig.resources.limits.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.limits.memory | quote }}
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       nodeSelector:

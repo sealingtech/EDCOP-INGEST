@@ -1,52 +1,89 @@
 # EDCOP Ingest Node Chart values
 images:
-  # Base image: docker.elastic.co/elasticsearch/logstash:6.2.4 
-  logstash: docker.elastic.co/elasticsearch/logstash:6.2.4
-  redis: 4.0.9
+  # Base image: docker.elastic.co/logstash/logstash:6.2.4 
+  logstash: docker.elastic.co/logstash/logstash:6.2.4
+  redis: redis:4.0.9
 networks:
   # Overlay is the name of the default cni network
   overlay: calico
 logstashConfig:
   # Set each pipeline to 'true' or 'false' to enable or disable them. 
+  # At least one feature needs to be enabled
   features:
     syslog:
       # Enables Logstash to ingest syslogs from the chosen port on the host
       # Point syslogs to Logstash at $HOST-IP:$PORT 
-      # *Default Kubneretes nodeports range from 30000 - 32767  
-      # *This port will be exposed on each host the pod runs on, 
-      #  so you can point traffic to anyone of your ingest nodes 
-      #  and have it loadbalanced from there
-      port: 30144
       enabled: true
+      # Default Kubneretes nodeports range from 30000 - 32767  
+      # This port will be exposed on each host the pod runs on, 
+      # so you can point traffic to anyone of your ingest nodes 
+      # and have it loadbalanced from there
+      port: 30144
+      # Syslog pipeline
+      pipeline:
+        #Limits the number of threads that will be used by Logstash
+        threads: 2
+        #Configures the batch count that Logstash will process at a time.
+        batchCount: 250
+        #Sets the number of workers for pulling Redis events
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        #Sets the amount of events grabbed from Redis at one time.
+        pipelineBatchSize: 150
     packetbeat: 
       # Enables Logstash to ingest Packetbeat logs from Redis within the cluster
       # Point Packetbeat to 'ingest-service' using port 6379
       # *Note: Port 6379 is internal to the cluster
       enabled: false
+      # packetbeat pipeline settings
+      pipeline:
+        # Limits the number of threads that will be used by Logstash
+        threads: 2
+        # Configures the batch count that Logstash will process at a time.
+        batchCount: 250
+        # Sets the number of workers for pulling Redis events
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        # Sets the amount of events grabbed from Redis at one time.
+        pipelineBatchSize: 150
     bro: 
       # Enables Logstash to ingest Bro logs from Redis within the cluster
       # Point Bro's logs to 'ingest-service' using port 6379
       # *Note: Port 6379 is internal to the cluster
       enabled: false
+      # Bro pipeline settings
+      pipeline:
+        # Limits the number of threads that will be used by Logstash
+        threads: 2
+        # Configures the batch count that Logstash will process at a time.
+        batchCount: 250
+        # Sets the number of workers for pulling Redis events
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        # Sets the amount of events grabbed from Redis at one time.
+        pipelineBatchSize: 150
     suricata:
       # Enables Logstash to ingest Suricata logs from Redis within the cluster
       # Point Suricata's logs to 'ingest-service' using port 6379
       # *Note: Port 6379 is internal to the cluster
       enabled: false
-  environment:
-    #Limits the number of threads that will be used by Logstash
-    threads: 2
-    #Configures the batch count that Logstash will process at a time.
-    batchCount: 250
+      # Suricata pipeline settings
+      pipeline:
+        # Limits the number of threads that will be used by Logstash
+        threads: 2
+        #Configures the batch count that Logstash will process at a time.
+        batchCount: 250
+        # Sets the number of workers for pulling Redis events
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        # Sets the amount of events grabbed from Redis at one time.
+        pipelineBatchSize: 150
+  resources:
+    # Resources limit Logstash as a whole, not just individual pipelines
     #Sets the initial and max JVM heap that will be allocated, generally these two values should be the same.
     initialJvmHeap: 4g
     maxJvmHeap: 4g
-    #Sets the number of workers for pulling Redis events
-    pipelineOutputWorkers: 2
-    #Sets the amount of events grabbed from Redis at one time.
-    pipelineBatchSize: 150
-  resources:
-    # Requests are set to accommodate limited resource VMs
+    # Default requests are set to accommodate limited resource VMs
     requests:
       cpu: 100m
       memory: 64Mi
@@ -61,9 +98,10 @@ redisConfig:
     # true or false
     enabled: true
     port: 30379
-  requests:
-    cpu: 100m
-    memory: 64Mi
-  limits:
-    cpu: 2
-    memory: 8G
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 2
+      memory: 8G
