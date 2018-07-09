@@ -28,7 +28,7 @@ spec:
         ports:
         - name: cport-5044
           containerPort: 5044
-        {{- if .Values.logstashConfig.pipelines.syslog.enabled }}
+        {{- if .Values.logstashConfig.features.syslog.enabled }}
         - name: cport-5144
           containerPort: 5144
         {{- end }}
@@ -42,19 +42,19 @@ spec:
         volumeMounts:
           - mountPath: /usr/share/logstash/config
             name: logstash-config
-          {{- if .Values.logstashConfig.pipelines.syslog.enabled }}
+          {{- if .Values.logstashConfig.features.syslog.enabled }}
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-syslog-pipeline
           {{- end }}
-          {{- if .Values.logstashConfig.pipelines.packetbeat.enabled }}
+          {{- if .Values.logstashConfig.features.packetbeat.enabled }}
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-packetbeat-pipeline
           {{- end }}
-          {{- if .Values.logstashConfig.pipelines.bro.enabled }}
+          {{- if .Values.logstashConfig.features.bro.enabled }}
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-bro-pipeline
           {{- end }}
-          {{- if .Values.logstashConfig.pipelines.suricata.enabled }}
+          {{- if .Values.logstashConfig.features.suricata.enabled }}
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-suricata-pipeline
           {{- end }}
@@ -62,22 +62,22 @@ spec:
       - name: logstash-config
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash--config
-      {{- if .Values.logstashConfig.pipelines.syslog.enabled }}
+      {{- if .Values.logstashConfig.features.syslog.enabled }}
       - name: logstash-syslog-pipeline
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-syslog-pipeline
       {{- end }}
-      {{- if .Values.logstashConfig.pipelines.packetbeat.enabled }}
+      {{- if .Values.logstashConfig.features.packetbeat.enabled }}
       - name: logstash-packetbeat-pipeline
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-packetbeat-pipeline
       {{- end }}
-      {{- if .Values.logstashConfig.pipelines.bro.enabled }}
+      {{- if .Values.logstashConfig.features.bro.enabled }}
       - name: logstash-bro-pipeline
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-bro-pipeline
       {{- end }}
-      {{- if .Values.logstashConfig.pipelines.suricata.enabled }}
+      {{- if .Values.logstashConfig.features.suricata.enabled }}
       - name: logstash-suricata-pipeline
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-suricata-pipeline

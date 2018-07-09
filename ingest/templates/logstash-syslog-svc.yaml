@@ -11,7 +11,7 @@ spec:
     protocol: TCP
     port: 5044
     targetPort: 5044
-  {{- if .Values.logstashConfig.pipelines.syslog.enabled }}
+  {{- if .Values.logstashConfig.features.syslog.enabled }}
   - name: tcp
     protocol: TCP
     port: 5144

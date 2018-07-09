@@ -1,4 +1,4 @@
-{{- if .Values.logstashConfig.pipelines.bro.enabled -}}
+{{- if .Values.logstashConfig.features.bro.enabled -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

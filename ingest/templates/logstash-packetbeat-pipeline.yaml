@@ -1,4 +1,4 @@
-{{- if .Values.logstashConfig.pipelines.packetbeat.enabled -}}
+{{- if .Values.logstashConfig.features.packetbeat.enabled -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
