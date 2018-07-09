@@ -1,0 +1,8 @@
+apiVersion: v1
+name: ingest
+home: https://github.com/sealingtech/EDCOP
+version: 0.1.0
+description: EDCOP Ingest Chart
+details:
+  This Chart provides an ingest Daemonset of Redis and Logstash for use with the EDCOP project
+icon: https://dzone.com/storage/temp/8346759-logical-architecture.jpg

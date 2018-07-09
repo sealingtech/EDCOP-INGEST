@@ -1,0 +1,41 @@
+apiVersion: extensions/v1beta1
+kind: Daemonset
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis
+  namespace: default
+  labels:
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "ingest.name" . }}-redis
+  template:
+    metadata:
+      name: {{ template "ingest.name" . }}-redis
+      labels:
+        app: {{ template "ingest.name" . }}-redis
+      annotations:
+        networks: '[
+        { "name": "{{ .Values.networks.overlay }}" }
+      ]'
+    spec:
+      containers:
+      - name: redis
+        image: {{ .Values.images.redis }}
+        imagePullPolicy: Always
+        ports:
+        - name: cport-6379
+          containerPort: 6379
+        resources:
+          requests:
+            cpu: {{ .Values.redisConfig.requests.cpu | quote }}
+            memory: {{ .Values.redisConfig.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.redisConfig.limits.cpu | quote }}
+            memory: {{ .Values.redisConfig.limits.memory | quote }}
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        ingest: "true"

@@ -1,0 +1,29 @@
+{{- if .Values.logstashConfig.pipelines.packetbeat.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "packetbeat.fullname" . }}-logstash-packetbeat-pipeline
+data:
+  packetbeat.conf: |
+    input {
+      redis {
+        host => "ingest-service"
+        key => "packetbeat"
+        data_type => "list"
+        codec => json
+        batch_count => {{ .Values.logstashConfig.environment.batchCount }}
+        threads => {{ .Values.logstashConfig.environment.threads }}
+      }
+    }
+    output {
+      elasticsearch {
+        hosts => "data-service:9200"
+        manage_template => false
+        index => "packetbeat-%{+YYYY.MM.dd}"
+        document_type => "event"
+        codec => json
+        #user => logstash_internal
+        #password => changeme
+      }
+    }
+{{- end -}}
