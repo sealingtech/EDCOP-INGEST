@@ -5,4 +5,4 @@ version: 0.1.0
 description: EDCOP Ingest Chart
 details:
   This Chart provides an ingest Daemonset of Redis and Logstash for use with the EDCOP project
-icon: https://dzone.com/storage/temp/8346759-logical-architecture.jpg
+icon: https://www.elastic.co/guide/en/logstash/6.3/static/images/logstash.png
