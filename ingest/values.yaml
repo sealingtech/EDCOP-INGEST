@@ -79,8 +79,8 @@ logstashConfig:
         # Sets the amount of events grabbed from Redis at one time.
         pipelineBatchSize: 150
   resources:
-    # Resources limit Logstash as a whole, not just individual pipelines
-    #Sets the initial and max JVM heap that will be allocated, generally these two values should be the same.
+    # Resources limit Logstash as a whole
+    # Sets the initial and max JVM heap that will be allocated, generally these two values should be the same.
     initialJvmHeap: 4g
     maxJvmHeap: 4g
     # Default requests are set to accommodate limited resource VMs
