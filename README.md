@@ -61,7 +61,7 @@ Logstash is currently deployed as a Daemonset to all ingest nodes which allows f
 ### Features
 
 Each feature (tool) contains its own configuration and can be disabled in the ```values.yaml``` file. You can prioritize resource allocation by giving certain tools more resources within the pipeline sections. 
-* Note: at least one feature needs to be enabled for Logstash to work
+*Note: at least one feature needs to be enabled for Logstash to work*
 
 Each feature has a ```pipeline``` section in which you can set Logstash pipeline settings for that specific feature. In general, the higher these settings, the more effort Logstash puts into processing that pipeline. Keep in mind, Logstash is still limited by the resources you give it in the next section. 
 
