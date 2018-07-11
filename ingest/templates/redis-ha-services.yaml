@@ -1,0 +1,54 @@
+{{- if .Values.redisConfig.highAvailability.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis-master-svc
+  labels:
+    app: {{ template "ingest.name" . }}-redis
+spec:
+  ports:
+  - port: 6379
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app: {{ template "ingest.name" . }}-redis
+    redis-node: "true"
+    redis-role: "master"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis-slave-svc
+  labels:
+    role: service
+    app: {{ template "ingest.name" . }}-redis
+spec:
+  ports:
+  - port: 6379
+    protocol: TCP
+    targetPort: 6379
+  selector:
+    app: {{ template "ingest.name" . }}-redis
+    redis-node: "true"
+    redis-role: "slave"
+    
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "ingest.fullname" . }}-sentinel
+  labels:
+    name: {{ template "ingest.name" . }}-redis-sentinel-svc
+    role: service
+    app: {{ template "ingest.name" . }}-redis
+spec:
+  ports:
+  - port: 26379
+    targetPort: 26379
+  selector:
+    app: {{ template "ingest.name" . }}-redis
+    redis-role: "sentinel"
+{{- end -}}

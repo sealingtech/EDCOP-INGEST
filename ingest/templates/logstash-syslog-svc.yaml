@@ -24,3 +24,4 @@ spec:
   {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-logstash
+    component: logstash

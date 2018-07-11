@@ -17,3 +17,4 @@ spec:
   {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-redis
+    

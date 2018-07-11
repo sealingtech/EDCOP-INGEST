@@ -2,12 +2,15 @@
 images:
   # Base image: docker.elastic.co/logstash/logstash:6.2.4 
   logstash: docker.elastic.co/logstash/logstash:6.2.4
-  redis: redis:4.0.9
+  # HA Redis REQUIRES the following image:
+  # Highly Availability Redis: quay.io/smile/redis:4.0.8r0
+  # Regular Redis: redis:4.0.9
+  redis: "redis:4.0.9"
 networks:
   # Overlay is the name of the default cni network
   overlay: calico
 logstashConfig:
-  # Set each pipeline to 'true' or 'false' to enable or disable them. 
+  # Set each feature to 'true' or 'false' to enable or disable them. 
   # At least one feature needs to be enabled
   features:
     syslog:
@@ -91,6 +94,14 @@ logstashConfig:
       cpu: 2
       memory: 8G
 redisConfig:
+  # Enables a highly available Redis cluster across ingest nodes
+  # Set to 'true' or 'false'
+  # Minimum of two servers and two sentinels
+  # DO NOT enable HA on single node clusters!
+  highAvailability:
+    enabled: false
+    servers: 2
+    sentinels: 2 
   # Allow applications to send data to Redis from outside the cluster
   # Opens a nodePort on ingest nodes to allow traffic into Redis
   # Point Redis traffic to $HOST-IP:$PORT 
@@ -99,9 +110,19 @@ redisConfig:
     enabled: true
     port: 30379
   resources:
-    requests:
-      cpu: 100m
-      memory: 64Mi
-    limits:
-      cpu: 2
-      memory: 8G
+    server:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 8G
+    # Ignores if highvailability is set to 'false'
+    sentinel:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 8G
+

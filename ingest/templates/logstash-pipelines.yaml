@@ -54,6 +54,9 @@ data:
       }
     }
     output {
+      stdout { codec => rubydebug }
+    }
+    output {
       elasticsearch {
         hosts => "data-service:9200"
         manage_template => false
@@ -98,7 +101,9 @@ data:
         rename => { "id.orig_h" => "bro_id_orig_h" }
       }
     } 
- 
+    output {
+      stdout { codec => rubydebug }
+    }
     output {
       elasticsearch {
         hosts => "data-service:9200"
@@ -122,6 +127,9 @@ data:
         batch_count => {{  .Values.logstashConfig.features.suricata.pipeline.batchCount }}
         threads => {{  .Values.logstashConfig.features.suricata.pipeline.threads }}
       }
+    }
+    output {
+      stdout { codec => rubydebug }
     }
     output {
       elasticsearch {
