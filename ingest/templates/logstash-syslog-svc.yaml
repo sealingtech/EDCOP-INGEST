@@ -4,7 +4,8 @@ metadata:
   name: {{ template "ingest.fullname" . }}-logstash
   namespace: default
   labels:
-    app: {{ template "ingest.name" . }}
+    app: {{ template "ingest.name" . }}-logstash
+    component: logstash
 spec:
   ports:
   - name: tcp-5044

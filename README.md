@@ -15,13 +15,14 @@ Table of Contents
 			* [Custom Features](#custom-features)
 		* [Resources](#resources)
 	* [Redis Configuration](#redis-configuration)
+		* [High Availability](#high-availability)
 		* [External Logs](#external-logs)
 		* [Resources](#resources)
 		
 		
 # Configuration Guide
 
-Within this configuration guide, you will find instructions for modifying the Helm chart for EDCOP ingest nodes. All changes should be made in the ```values.yaml``` file.
+Within this configuration guide, you will find instructions for modifying the Helm chart for EDCOP nodes with the label ```ingest=true```. All changes should be made in the ```values.yaml``` file.
 Please share any bugs or feature requests via GitHub issues.
  
 ## Image Repository
@@ -182,7 +183,41 @@ logstashConfig:
 
 ## Redis Configuration
 
-Redis is also included as part of EDCOP ingest nodes due to its role as a buffer for Logstash. If you have applications running outside of the cluster, but would like to send logs to EDCOP, you can set ```external.enabled``` to ```true``` to expose a NodePort for external access. As previously stated with Syslog, this port must be within the default Kubernetes NodePort range (30000 - 32767) and must be usable across all ingest nodes. 
+Redis is also included as part of EDCOP ingest nodes due to its role as a buffer for Logstash. If you do not want HA Redis, the Redis servers will be deployed as a DaemonSet to all ingest nodes. 
+
+### High Availability
+
+Redis is capable of being deployed in HA mode for clusters with 2+ nodes, but before you do so please read the following for a conceptual overview: https://redislabs.com/redis-features/high-availability. 
+
+In order to enable HA Redis for your EDCOP cluster, you will need to change the Redis image value at the top of the ```values.yaml``` file. The most recent version of HA Redis will be commented above this value.
+
+```
+images:
+  logstash: docker.elastic.co/logstash/logstash:6.2.4
+  redis: quay.io/smile/redis:4.0.9r0
+```
+
+Afterwards, you will need to enable it by setting the ```enabled``` option to ```true```. 
+
+```
+redisConfig:
+  highAvailability:
+    enabled: true
+```
+
+Since HA mode replicates data across Redis nodes, you do not want too many instances otherwise you're wasting resources and bandwidth. You can decide how many Redis servers and sentinels to deploy, but remember that you need at least two of each for it to work. 
+
+```
+redisConfig:
+  highAvailability:
+    enabled: true
+	servers: 2
+    sentinels: 2 
+```
+
+### External Logs
+
+If you have applications running outside of the cluster, but would like to send logs to EDCOP, you can set ```external.enabled``` to ```true``` to expose a NodePort for external access. As previously stated with Syslog, this port must be within the default Kubernetes NodePort range (30000 - 32767) and must be usable across all ingest nodes. 
 
 ```
 redisConfig:
@@ -191,15 +226,25 @@ redisConfig:
 	port: 30379
 ```
 
-As with Logstash, you can set resource limits on Redis to ensure it doesn't hog all of your node's resources, especially if running in VMs. 
+### Resources
+
+As with Logstash, you can set resource limits on Redis to ensure it doesn't hog all of your node's resources, especially if running in VMs. If you aren't deploying HA Redis, the sentinel portion is ignored. 
 
 ```
 redisConfig:
   resources:
-    requests:
-      cpu: 100m
-      memory: 64Mi
-    limits:
-      cpu: 2
-      memory: 8G
+    server:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 8G
+    sentinel:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 2G
 ```

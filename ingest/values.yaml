@@ -3,7 +3,7 @@ images:
   # Base image: docker.elastic.co/logstash/logstash:6.2.4 
   logstash: docker.elastic.co/logstash/logstash:6.2.4
   # HA Redis REQUIRES the following image:
-  # Highly Availability Redis: quay.io/smile/redis:4.0.8r0
+  # Highly Availability Redis: quay.io/smile/redis:4.0.9r0
   # Regular Redis: redis:4.0.9
   redis: "redis:4.0.9"
 networks:
@@ -124,5 +124,5 @@ redisConfig:
         memory: 64Mi
       limits:
         cpu: 2
-        memory: 8G
+        memory: 2G
 
