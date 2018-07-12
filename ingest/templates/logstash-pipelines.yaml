@@ -79,6 +79,33 @@ data:
       }
     }
 {{- end }}
+{{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+  winlogbeat.conf: |
+    input {
+      redis {
+        host => "ingest-service"
+        key => "winlogbeat"
+        data_type => "list"
+        codec => json
+        batch_count => {{ .Values.logstashConfig.features.winlogbeat.pipeline.batchCount }}
+        threads => {{ .Values.logstashConfig.features.winlogbeat.pipeline.threads }}
+      }
+    }
+    output {
+      stdout { codec => rubydebug }
+    }
+    output {
+      elasticsearch {
+        hosts => "data-service:9200"
+        manage_template => false
+        index => "winlogbeat-%{+YYYY.MM.dd}"
+        document_type => "event"
+        codec => json
+        #user => logstash_internal
+        #password => changeme
+      }
+    }
+{{- end }}
 {{- if .Values.logstashConfig.features.bro.enabled }}
   bro.conf: |
     input {

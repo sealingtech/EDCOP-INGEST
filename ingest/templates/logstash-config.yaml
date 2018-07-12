@@ -119,6 +119,14 @@ data:
       pipeline.output.workers: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineOutputWorkers }}
     {{- end }}
     
+    {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+    # Winlogbeat pipeline
+    - pipeline.id: winlogbeat
+      pipeline.workers: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineWorkers }}
+      pipeline.batch.size: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineBatchSize }}
+      pipeline.output.workers: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineOutputWorkers }}
+    {{- end }}
+    
     {{- if .Values.logstashConfig.features.bro.enabled }}
     # Bro pipeline
     - pipeline.id: bro

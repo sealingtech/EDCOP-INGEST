@@ -10,6 +10,7 @@ Table of Contents
 		* [Features](#features)
 			* [Syslog](#syslog)
 			* [Packetbeat](#packetbeat)
+			* [Winlogbeat](#winlogbeat)
 			* [Bro](#bro)
 			* [Suricata](#suricata)
 			* [Custom Features](#custom-features)
@@ -117,6 +118,36 @@ logstashConfig:
         pipelineOutputWorkers: 2
         pipelineBatchSize: 150
 ``` 
+
+#### Winlogbeat
+
+You can enable the Winlogbeat pipeline by setting ```enabled``` to ```true```, which allows Logstash to pull Winlogbeat logs from Redis using the key *winlogbeat*. This **requires** the use of externally available Redis in order to ingest logs from hosts outside of EDCOP. 
+
+```
+logstashConfig:
+  features:
+    winlogbeat:
+      enabled: true
+      pipeline:
+        threads: 2
+        batchCount: 250
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        pipelineBatchSize: 150
+``` 
+
+In order to point your Winlogbeat logs to Redis, you need to edit the ```winlogbeat.yml``` on the host system of where it lives. Please **disable** all other outputs and enable the Redis output as shown below. Remember to replace the $HOST-IP with the IP of one of the ingest nodes and the $REDIS-NODEPORT with the port you have chosen within the Redis section of this guide.
+
+*For more information on configuring Winlogbeat, please refer to the [Configuring Winlogbeat Guide](https://www.elastic.co/guide/en/beats/winlogbeat/current/configuring-howto-winlogbeat.html).*
+
+```
+output.redis:
+  hosts: ["$HOST-IP:$REDIS-NODEPORT"]
+  #password: "my_password"
+  key: "winlogbeat"
+  db: 0
+  timeout: 5
+```
 
 #### Bro
 
