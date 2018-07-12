@@ -107,7 +107,7 @@ redisConfig:
   # Point Redis traffic to $HOST-IP:$PORT 
   external:
     # true or false
-    enabled: true
+    enabled: false
     port: 30379
   resources:
     server:
