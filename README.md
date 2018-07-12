@@ -136,7 +136,7 @@ logstashConfig:
         pipelineBatchSize: 150
 ``` 
 
-In order to point your Winlogbeat logs to Redis, you need to edit the ```winlogbeat.yml``` on the host system of where it lives. Please **disable** all other outputs and enable the Redis output as shown below. Remember to replace the $HOST-IP with the IP of one of the ingest nodes and the $REDIS-NODEPORT with the port you have chosen within the Redis section of this guide.
+In order to point your Winlogbeat logs to Redis, you need to edit the ```winlogbeat.yml``` on the host system of where it lives. Please **disable** all other outputs and enable the Redis output as shown below. Remember to replace the ```$HOST-IP``` with the IP of one of the ingest nodes and the ```$REDIS-NODEPORT``` with the port you have chosen within the Redis section of this guide.
 
 *For more information on configuring Winlogbeat, please refer to the [Configuring Winlogbeat Guide](https://www.elastic.co/guide/en/beats/winlogbeat/current/configuring-howto-winlogbeat.html).*
 

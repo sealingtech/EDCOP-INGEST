@@ -55,7 +55,7 @@ logstashConfig:
       # Point your Winlogbeat instance to '$HOST-IP' using the port 
       # you specify in the section for Redis below. 
       enabled: false
-      # packetbeat pipeline settings
+      # winlogbeat pipeline settings
       pipeline:
         # Limits the number of threads that will be used by Logstash
         threads: 2
