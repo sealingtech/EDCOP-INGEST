@@ -17,4 +17,5 @@ spec:
   {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-redis
+    redis-node: "true"
     
