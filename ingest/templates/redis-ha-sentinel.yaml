@@ -1,0 +1,48 @@
+{{- if .Values.redisConfig.highAvailability.enabled -}}
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis-sentinel
+  labels:
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.redisConfig.highAvailability.sentinels }}
+  template:
+    metadata:
+      name: {{ template "ingest.name" . }}-redis-sentinel
+      labels:
+        name: {{ template "ingest.fullname" . }}-redis-sentinel
+        app: {{ template "ingest.name" . }}-redis
+        component: sentinel
+      annotations:
+        networks: '[
+        { "name": "{{ .Values.networks.overlay }}" }
+      ]'
+    spec:
+      serviceAccountName: {{ template "ingest.fullname" . }}-redis
+      containers:
+      - name: redis
+        image: {{ .Values.images.redis }}
+        imagePullPolicy: Always
+        env:
+        - name: SENTINEL
+          value: "true"
+        - name: REDIS_CHART_PREFIX
+          value: {{ template "ingest.fullname" . }}-redis-
+        ports:
+        - name: cport-26379
+          containerPort: 26379
+        resources:
+          requests:
+            cpu: {{ .Values.redisConfig.resources.sentinel.requests.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.sentinel.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.redisConfig.resources.sentinel.limits.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.sentinel.limits.memory | quote }}
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        ingest: "true"  
+{{- end -}}

@@ -7,6 +7,7 @@ metadata:
     app: {{ template "ingest.name" . }}-logstash
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    component: logstash
 spec:
   selector:
     matchLabels:
@@ -16,6 +17,7 @@ spec:
       name: {{ template "ingest.name" . }}-logstash
       labels:
         app: {{ template "ingest.name" . }}-logstash
+        component: logstash
       annotations:
         networks: '[
         { "name": "{{ .Values.networks.overlay }}" }

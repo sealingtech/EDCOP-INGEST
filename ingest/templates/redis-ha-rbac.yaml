@@ -1,0 +1,48 @@
+{{- if .Values.redisConfig.highAvailability.enabled -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis
+  labels: 
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis
+  labels:
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+rules:
+- apiGroups:
+    - ""
+  resources:
+    - pods
+  verbs:
+    - get
+    - list
+    - patch
+    
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis
+  labels:
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "ingest.fullname" . }}-redis
+subjects:
+- kind: ServiceAccount
+  name: {{ template "ingest.fullname" . }}-redis
+{{- end -}}
