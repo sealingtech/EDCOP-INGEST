@@ -22,6 +22,13 @@ logstashConfig:
       # so you can point traffic to anyone of your ingest nodes 
       # and have it loadbalanced from there
       port: 30144
+      # Filters can be set to 'true' or 'false' and are not mandatory
+      # If you do not choose any filters, Logstash will do minimal parsing
+      # We have included some common devices/services here, but if you need more
+      # you should place them in the templates/logstash-pipeline.yaml file.
+      filters:
+        # Cisco ASA devices
+        cisco_asa: false
       # Syslog pipeline
       pipeline:
         #Limits the number of threads that will be used by Logstash
