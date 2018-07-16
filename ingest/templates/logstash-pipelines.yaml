@@ -81,9 +81,8 @@ data:
           mutate {
             convert => [ "[geoip][coordinates]", "float" ]
           }       
-          {{- end }}    
         }
-        
+        {{- end }}   
         # General syslog filtering
         syslog_pri { }      # Severity level
         date {
