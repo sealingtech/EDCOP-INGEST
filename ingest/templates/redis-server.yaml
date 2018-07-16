@@ -1,0 +1,70 @@
+apiVersion: extensions/v1beta1
+{{- if .Values.redisConfig.highAvailability.enabled }}
+kind: Deployment
+{{- else }}
+kind: DaemonSet
+{{- end }}
+metadata:
+  name: {{ template "ingest.fullname" . }}-redis-server
+  labels:
+    name: {{ template "ingest.fullname" . }}-redis-server
+    redis-node: "true"
+    app: {{ template "ingest.name" . }}-redis
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  {{- if .Values.redisConfig.highAvailability.enabled }}
+  replicas: {{ .Values.redisConfig.highAvailability.servers }}
+  {{- else }}
+  selector:
+    matchLabels:
+      app: {{ template "ingest.name" . }}-redis
+  {{- end }}
+  template:
+    metadata:
+      name: {{ template "ingest.fullname" . }}-redis-server
+      labels:
+        name: {{ template "ingest.fullname" . }}-redis-server
+        app: {{ template "ingest.name" . }}-redis
+        component: server
+        redis-node: "true"
+      annotations:
+        networks: '[
+        { "name": "{{ .Values.networks.overlay }}" }
+      ]'
+    spec:
+      {{- if .Values.redisConfig.highAvailability.enabled }}
+      serviceAccountName: {{ template "ingest.fullname" . }}-redis
+      {{- end }}
+      containers:
+      - name: redis
+        image: {{ .Values.images.redis }}
+        imagePullPolicy: Always
+        {{- if .Values.redisConfig.highAvailability.enabled }}
+        env:
+        - name: REDIS_SENTINEL_SERVICE_HOST
+          value: "redis-sentinel"
+        - name: REDIS_CHART_PREFIX
+          value: {{ template "ingest.fullname" . }}-redis-
+        {{- end }}
+        ports:
+        - name: cport-6379
+          containerPort: 6379
+        resources:
+          requests:
+            cpu: {{ .Values.redisConfig.resources.server.requests.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.server.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.redisConfig.resources.server.limits.cpu | quote }}
+            memory: {{ .Values.redisConfig.resources.server.limits.memory | quote }}
+      {{- if .Values.redisConfig.highAvailability.enabled }}
+        volumeMounts:
+        - mountPath: /redis-master-data
+          name: data
+      volumes:
+      - name: data
+      {{- end }}
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        ingest: "true"

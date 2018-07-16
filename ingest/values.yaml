@@ -2,12 +2,15 @@
 images:
   # Base image: docker.elastic.co/logstash/logstash:6.2.4 
   logstash: docker.elastic.co/logstash/logstash:6.2.4
-  redis: redis:4.0.9
+  # HA Redis REQUIRES the following image:
+  # Highly Availability Redis: quay.io/smile/redis:4.0.9r0
+  # Regular Redis: redis:4.0.9
+  redis: "redis:4.0.9"
 networks:
   # Overlay is the name of the default cni network
   overlay: calico
 logstashConfig:
-  # Set each pipeline to 'true' or 'false' to enable or disable them. 
+  # Set each feature to 'true' or 'false' to enable or disable them. 
   # At least one feature needs to be enabled
   features:
     syslog:
@@ -19,6 +22,13 @@ logstashConfig:
       # so you can point traffic to anyone of your ingest nodes 
       # and have it loadbalanced from there
       port: 30144
+      # Filters can be set to 'true' or 'false' and are not mandatory
+      # If you do not choose any filters, Logstash will do minimal parsing
+      # We have included some common devices/services here, but if you need more
+      # you should place them in the templates/logstash-pipeline.yaml file.
+      filters:
+        # Cisco ASA devices
+        cisco_asa: false
       # Syslog pipeline
       pipeline:
         #Limits the number of threads that will be used by Logstash
@@ -36,6 +46,23 @@ logstashConfig:
       # *Note: Port 6379 is internal to the cluster
       enabled: false
       # packetbeat pipeline settings
+      pipeline:
+        # Limits the number of threads that will be used by Logstash
+        threads: 2
+        # Configures the batch count that Logstash will process at a time.
+        batchCount: 250
+        # Sets the number of workers for pulling Redis events
+        pipelineWorkers: 2
+        pipelineOutputWorkers: 2
+        # Sets the amount of events grabbed from Redis at one time.
+        pipelineBatchSize: 150
+    winlogbeat: 
+      # Enables Logstash to ingest Winlogbeat logs from Redis
+      # REQUIRES the use of externally available Redis
+      # Point your Winlogbeat instance to '$HOST-IP' using the port 
+      # you specify in the section for Redis below. 
+      enabled: false
+      # winlogbeat pipeline settings
       pipeline:
         # Limits the number of threads that will be used by Logstash
         threads: 2
@@ -91,17 +118,36 @@ logstashConfig:
       cpu: 2
       memory: 8G
 redisConfig:
+  # Enables a highly available Redis cluster across ingest nodes
+  # Set to 'true' or 'false'
+  # Minimum of two servers and two sentinels
+  # DO NOT enable HA on single node clusters!
+  highAvailability:
+    enabled: false
+    servers: 2
+    sentinels: 2 
   # Allow applications to send data to Redis from outside the cluster
+  # REQUIRED for winlogbeat
   # Opens a nodePort on ingest nodes to allow traffic into Redis
   # Point Redis traffic to $HOST-IP:$PORT 
   external:
     # true or false
-    enabled: true
+    enabled: false
     port: 30379
   resources:
-    requests:
-      cpu: 100m
-      memory: 64Mi
-    limits:
-      cpu: 2
-      memory: 8G
+    server:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 8G
+    # Ignores if highvailability is set to 'false'
+    sentinel:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 2
+        memory: 2G
+
