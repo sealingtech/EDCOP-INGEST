@@ -135,6 +135,8 @@ logstashConfig:
         pipelineOutputWorkers: 2
         pipelineBatchSize: 150
 ``` 
+Before installing Winlogbeat, you will need Windows logs forwarded to a centralized logging location. To do this, please follow Microsoft's instructions available here: https://blogs.technet.microsoft.com/jepayne/2015/11/23/monitoring-what-matters-windows-event-forwarding-for-everyone-even-if-you-already-have-a-siem/
+
 When installing Winlogbeat on a Windows server, please use version **6.2.4** as it is the most recent version that works with EDCOP-INGEST. Download the zip file from https://www.elastic.co/downloads/past-releases/winlogbeat-6-2-4 and then follow the instructions available from https://www.elastic.co/guide/en/beats/winlogbeat/6.2/winlogbeat-installation.html. Be sure to use the aforementioned zip file as the download link in the install instructions points to the most current version (6.3.1). 
 
 In order to point your Winlogbeat logs to Redis, you need to edit the ```winlogbeat.yml``` on the host system of where it lives. Please **disable** all other outputs and enable the Redis output as shown below. Remember to replace the ```$HOST-IP``` with the IP of one of the ingest nodes and the ```$REDIS-NODEPORT``` with the port you have chosen within the Redis section of this guide. After installing and configuring, you can start Winlogbeat from ```services.msc```. 
