@@ -65,7 +65,7 @@ data:
     }
   winevent-security-template.json: |
     {
-      "index_patterns" : "logs-endpoint-winevent-security-*",
+      "index_patterns" : "winlogbeat-endpoint-winevent-security-*",
       "settings" : {
         "index.refresh_interval": "5s"
       },
@@ -103,7 +103,7 @@ data:
     }
   winevent-sysmon-template.json: |
     {
-      "index_patterns" : "logs-endpoint-winevent-sysmon-*",
+      "index_patterns" : "winlogbeat-endpoint-winevent-sysmon-*",
       "settings" : {
         "index.refresh_interval": "5s"
       },
@@ -154,7 +154,7 @@ data:
     }
   winevent-system-template.json: |
     {
-      "index_patterns" : "logs-endpoint-winevent-system-*",
+      "index_patterns" : "winlogbeat-endpoint-winevent-system-*",
       "settings" : {
         "index.refresh_interval": "5s"
       },
@@ -182,8 +182,7 @@ data:
       }
     }
   winevent-wmiactivity-template.json: |
-    {
-      "index_patterns" : "logs-endpoint-winevent-wmiactivity-*",
+      "index_patterns" : "winlogbeat-endpoint-winevent-wmiactivity-*",
       "settings" : {
         "index.refresh_interval": "5s"
       },

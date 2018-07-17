@@ -168,8 +168,7 @@ data:
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     output {
-      # Added tags in if statement
-      if [log_name] == "Security" and "winlogbeat" in [tags] {
+      if [log_name] == "Security" {
         elasticsearch {
           hosts => ["data-service:9200"]
           index => "winlogbeat-endpoint-winevent-security-%{+YYYY.MM.dd}"
@@ -185,7 +184,7 @@ data:
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     output {
-      if [log_name] == "System" and "winlogbeat" in [tags] {
+      if [log_name] == "System" {
         elasticsearch {
           hosts => ["data-service:9200"]
           index => "winlogbeat-endpoint-winevent-system-%{+YYYY.MM.dd}"
@@ -201,7 +200,7 @@ data:
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     output {
-      if [log_name] == "Application" and "winlogbeat" in [tags] {
+      if [log_name] == "Application" {
         elasticsearch {
           hosts => ["data-service:9200"]
           index => "winlogbeat-endpoint-winevent-application-%{+YYYY.MM.dd}"
