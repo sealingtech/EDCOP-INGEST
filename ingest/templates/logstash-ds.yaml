@@ -26,7 +26,7 @@ spec:
       {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
       initContainers:
       - name: logstash-init
-        image: centos:
+        image: centos
         command: 
         - chmod
         - "+x"
@@ -36,7 +36,7 @@ spec:
         volumeMounts:
         - mountPath: /attack-csv/
           name: mitre-attack-csv
-        - name: logstash-init
+        - name: logstash-init-script
           mountPath: /scripts/logstash-init.sh
           subPath: logstash-init.sh
       {{- end }}
@@ -64,8 +64,6 @@ spec:
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-pipelines
           {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
-          - mountPath: /usr/share/logstash/pipeline/
-            name: logstash-filters
           - mountPath: /usr/share/logstash/output_templates/
             name: logstash-templates
           - mountPath: /usr/share/logstash/cti/
@@ -78,11 +76,7 @@ spec:
       - name: logstash-pipelines
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-pipelines
-      restartPolicy: Always
       {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
-      - name: logstash-filters
-        configMap:
-          name: {{ template "ingest.fullname" . }}-logstash-filters
       - name: logstash-templates
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-templates
@@ -93,6 +87,7 @@ spec:
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-init-script
       {{- end }}
+      restartPolicy: Always
       dnsPolicy: ClusterFirst
       nodeSelector:
         ingest: "true"

@@ -7,7 +7,9 @@ data:
     # enables stdout for debugging
     output {
       stdout { codec => rubydebug }
-    }  
+    }
+    
+########### Begin I/O Configs ############    
 {{- if .Values.logstashConfig.features.syslog.enabled }}
   01-syslog-input.conf: |
     input {
@@ -249,6 +251,1794 @@ data:
         elasticsearch {
             hosts => ["data-service:9200"]
             index => "mitre-attack-%{+YYYY.MM.dd}"
+        }
+      }
+    }
+{{- end }}
+
+############ END I/O CONFIGS #############
+
+########## Begin Filter Configs ##########
+{{- if .Values.logstashConfig.features.syslog.enabled }}
+  21-syslog-filters.conf: |
+    filter {
+      if [type] == "syslog" {
+        {{- if .Values.logstashConfig.features.syslog.filters.cisco_asa }}
+        # Cisco specific filters
+        if "%ASA-" in [message] {
+          mutate {
+            add_tag => [ "Firewall", "ASA" ]
+          }
+          grok {
+            match => ["message", "%{CISCO_TAGGED_SYSLOG} %{GREEDYDATA:cisco_message}"]   
+          }
+          if !("_grokparsefailure" in [tags]) {
+            mutate {
+              rename => ["cisco_message", "message"]
+              remove_field => ["timestamp"]
+            }
+          }
+          grok {
+            match => [
+              "message", "%{CISCOFW104001}",
+              "message", "%{CISCOFW104002}",
+              "message", "%{CISCOFW104003}",
+              "message", "%{CISCOFW104004}",
+              "message", "%{CISCOFW105003}",
+              "message", "%{CISCOFW105004}",
+              "message", "%{CISCOFW105005",
+              "message", "%{CISCOFW105008",
+              "message", "%{CISCOFW105009",
+              "message", "%{CISCOFW106001}",
+              "message", "%{CISCOFW106006_106007_106010}",
+              "message", "%{CISCOFW106014}",
+              "message", "%{CISCOFW106015}",
+              "message", "%{CISCOFW106021}",
+              "message", "%{CISCOFW106023}",
+              "message", "%{CISCOFW106100_2_3}",
+              "message", "%{CISCOFW106100}",
+              "message", "%{CISCOFW304001}",
+              "message", "%{CISCOFW110002}",
+              "message", "%{CISCOFW302010}",
+              "message", "%{CISCOFW302013_302014_302015_302016}",
+              "message", "%{CISCOFW302020_302021}",
+              "message", "%{CISCOFW305011}",
+              "message", "%{CISCOFW313001_313004_313008}",
+              "message", "%{CISCOFW313005}",
+              "message", "%{CISCOFW321001}",
+              "message", "%{CISCOFW402117}",
+              "message", "%{CISCOFW402119}",
+              "message", "%{CISCOFW419001}",
+              "message", "%{CISCOFW419002}",
+              "message", "%{CISCOFW500004}",
+              "message", "%{CISCOFW602303_602304}",
+              "message", "%{CISCOFW710001_710002_710003_710005_710006}",
+              "message", "%{CISCOFW713172}",
+              "message", "%{CISCOFW733100}"
+            ]
+          }    
+          geoip {
+            source => "src_ip"
+            target => "geoip"
+            add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
+            add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
+          }   
+          mutate {
+            convert => [ "[geoip][coordinates]", "float" ]
+          }       
+        }
+        {{- end }}   
+
+        # General syslog filtering
+        syslog_pri { }      # Severity level
+        date {
+          match => [ "syslog_timestamp", "MMM dd HH:mm:ss", "MMM  d HH:mm:ss", "MMM dd yyyy HH:mm:ss", "MMM  d yyyy HH:mm:ss" ]
+        }          
+      }
+    }
+{{- end }}
+{{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+  30-helk-winevent-powershell-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    # Reference:
+    # Nate Guagenti (@neu5ron) https://gist.github.com/neu5ron/450289373db61d5c8d7378e79455ef07#file-511-windows-event-powershell-operational-conf
+
+    filter {
+      if [source_name] == "Microsoft-Windows-PowerShell" or [source_name] == "PowerShell"{
+        if [event_id] == 4103 {
+          mutate {
+            add_field => [ "PayloadInvocation", "%{[event_data][Payload]}" ]
+            add_field => [ "PayloadParams", "%{[event_data][Payload]}" ]
+            gsub => [
+            "[event_data][ContextInfo]", "      ", "",
+            "[event_data][ContextInfo]", " = ", "="
+            ]
+          }
+          mutate {
+            gsub => [
+              "PayloadInvocation", "CommandInvocation\(.*\)",  "commandinvocation",
+              "PayloadInvocation", "ParameterBinding.*\r\n", "",
+              "PayloadParams", "parameterbinding\(.*\)", "parameterbinding",
+              "PayloadParams", "CommandInvocation.*\r\n", "",
+              "[event_data][Payload]", "CommandInvocation.*\r\n", "",
+              "[event_data][Payload]", "ParameterBinding.*\r\n", ""
+            ]
+            rename => { "[event_load][Payload]" => "[powershell][payload]" }
+          }     
+          kv {
+            source => "PayloadInvocation"
+            field_split => "\n"
+            value_split => ":"
+            allow_duplicate_values => false
+            target => "[powershell]"
+            include_keys => [ "commandinvocation" ]
+          }
+          kv {
+            source => "PayloadParams"
+            value_split => "="
+            allow_duplicate_values => false
+            target => "[powershell][param]"
+            include_keys => [ "name", "value" ]
+          }
+          kv {
+            source => "[event_data][ContextInfo]"
+            field_split => "\r\n"
+            value_split => "="
+            remove_char_key => " "
+            allow_duplicate_values => false
+            include_keys => [ "Severity", "HostName", "HostVersion", "HostID", "HostApplication", "EngineVersion", "RunspaceID", "PipelineID", "CommandName", "CommandType", "ScriptName", "CommandPath", "SequenceNumber", "ConnectedUser", "ShellID" ]
+          }
+          mutate {
+            rename => { 
+              "CommandName" => "[powershell][command][name]"
+              "CommandPath" => "[powershell][command][path]"
+              "CommandType" => "[powershell][command][type]"
+              "ConnectedUser" => "[powershell][connected][user]"
+              "EngineVersion" => "[powershell][engine][version]"
+              "HostApplication" => "[powershell][host][application]"
+              "HostID" => "[powershell][host][id]"
+              "HostName" => "[powershell][host][name]"
+              "HostVersion" => "[powershell][host][version]"
+              "PipelineID" => "[powershell][pipeline][id]"
+              "RunspaceID" => "[powershell][runspace][id]"
+              "Scriptname" => "[powershell][script][name]"
+              "SequenceNumber" => "[powershell][sequence][number]"
+              "ShellID" => "[powershell][shell][id]"
+            }
+            remove_field => [
+              "Severity",
+              "EventType",
+              "Keywords",
+              "message",
+              "Opcode",
+              "PayloadInvocation",
+              "PayloadParams",
+              "[event_data][Payload]",
+              "[event_data][ContextInfo]"
+            ]
+            convert => { "[powershell][pipeline][id]" => "integer" }
+            convert => { "[powershell][sequence][number]" => "integer" }
+          }
+        }
+        if [event_id] == 4104 {
+          mutate {
+            rename => { 
+              "[event_data][MessageNumber]" => "[powershell][message][number]"
+              "[event_data][MessageTotal]" => "[powershell][message][total]"
+              "[event_data][ScriptBlockId]" => "[powershell][scriptblock][id]"
+              "[event_data][ScriptBlockText]" => "[powershell][scriptblock][text]"
+              "[event_data][Path]" => "[powershell][script][path]" 
+            }
+            remove_field => [ "message" ]
+             convert => { "[powershell][message][number]" => "integer" }
+            convert => { "[powershell][message][total]" => "integer" }
+            convert => { "[powershell][scriptblock][id]" => "integer" }
+          }
+        }
+        if [event_id] == 400 or [event_id] == 600 {
+          kv {
+            source => "[event_data][param3]"
+            field_split => "\n"
+            value_split => "="
+            trim_key => "\t"
+            allow_duplicate_values => false
+          }
+          mutate {
+            rename => {
+              "ProviderName" => "[powershell][providername]"
+              "NewProviderState" => "[powershell][newproviderstate]"
+              "SequenceNumber" => "[powershell][sequencenumber"
+              "HostName" => "[powershell][host][name]"
+              "HostVersion" => "[powershell][host][version]"
+              "HostId" => "[powershell][host][id]"
+              "HostApplication" => "[powershell][host][application]"
+              "EngineVersion" => "[powershell][engine][version]"
+              "RunspaceId" => "[powershell][runspace][id]"
+              "PipelineId" => "[powershell][pipeline][id]"
+              "CommandName" => "[powershell][command][name]"
+              "CommandType" => "[powershell][command][type]"
+              "ScriptName" => "[powershell][script][name]"
+              "CommandPath" => "[powershell][command][path]"
+              "CommandLine" => "[powershell][command][line]"
+              "NewEngineState" => "[powershell][newengine][state]"
+              "PreviousEngineState" => "[powershell][previousengine][state]"
+            }
+            remove_field => [ "message" ]
+            remove_field => "[event_data][param1]"
+            remove_field => "[event_data][param2]"
+            remove_field => "[event_data][param3]"
+          }
+        }
+      }
+    }
+  31-helk-winevent-sysmon-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if [log_name] == "Microsoft-Windows-Sysmon/Operational"{
+        mutate {
+          rename => {
+            "[user][domain]" => "user_reporter_domain"
+            "[user][identifier]" => "user_reporter_sid"
+            "[user][name]" => "user_reporter_name"
+            "[user][type]" => "user_reporter_type"
+            "computer_name" => "host_name"
+          }
+        }
+        if [provider_guid] {
+          mutate {
+            gsub => ["provider_guid","[{}]",""]
+          }
+        }
+        if [event_data][RuleName] {
+          kv {
+            source => "[event_data][RuleName]"
+            field_split => ","
+            value_split => "="
+            prefix => "mitre_"
+            transform_key => "lowercase"
+          }
+        }
+        if [event_data][Image] {
+          if [event_data][Image] =~ /^(\w*$)|^(\w*\..*$)/ {
+            mutate {
+              copy => {"[event_data][Image]" => "process_name"}
+            }
+          }
+          else {
+            grok {
+              match => { "[event_data][Image]" => ".*\\%{GREEDYDATA:process_name}" }
+              tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+            }
+          }
+          mutate {
+            rename => {
+              "[event_data][Image]" => "process_path"
+              "[event_data][ProcessGuid]" => "process_guid"
+              "[event_data][ProcessId]" => "process_id"
+            }
+            gsub => ["process_guid","[{}]",""]
+          }
+        }
+        if [event_data][ParentImage] {
+          grok {
+            match => { "[event_data][ParentImage]" => ".*\\%{GREEDYDATA:process_parent_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+        }
+        if [event_data][Hashes] {
+          kv {
+            source => "[event_data][Hashes]"
+            field_split => ","
+            value_split => "="
+            prefix => "hash_"
+            transform_key => "lowercase"
+          }
+        }
+        if [event_data][TargetImage] {
+          grok { 
+            match => { "[event_data][SourceImage]" => ".*\\%{GREEDYDATA:process_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+          grok { 
+            match => { "[event_data][TargetImage]" => ".*\\%{GREEDYDATA:target_process_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+          mutate {
+            rename => {
+              "[event_data][SourceImage]" => "process_path"
+              "[event_data][SourceProcessGUID]" => "process_guid"
+              "[event_data][SourceProcessId]" => "process_id"
+              "[event_data][TargetImage]" => "target_process_path"
+              "[event_data][TargetProcessGUID]" => "target_process_guid"
+              "[event_data][TargetProcessId]" => "target_process_id"
+            }
+            gsub => ["process_guid","[{}]",""]
+            gsub => ["target_process_guid","[{}]",""]
+          }
+        }
+        if [event_data][User] {
+          grok {
+            match => { "[event_data][User]" => "%{GREEDYDATA:user_domain}\\%{GREEDYDATA:user_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+        }
+        if [event_data][LogonId] {
+          mutate { rename => { "[event_data][LogonId]" => "user_logon_id" }}
+          mutate { gsub => [ "user_logon_id", "0x", "" ]}
+          ruby {
+            code => "
+              userlogonid = event.get('user_logon_id')
+              userlogonid = userlogonid.hex
+              event.set('user_logon_id', userlogonid)
+            "
+            tag_on_exception =>  "_0591_rubyexception"
+          }
+        }
+        if [event_id] == 1 {
+          mutate {
+            add_field => { "action" => "processcreate" }
+            rename => {
+              "[event_data][CommandLine]" => "process_command_line"
+              "[event_data][CurrentDirectory]" => "process_current_directory"
+              "[event_data][ParentImage]" => "process_parent_path"
+              "[event_data][ParentCommandLine]" => "process_parent_command_line"
+              "[event_data][IntegrityLevel]" => "process_integrity_level"
+              "[event_data][LogonGuid]" => "user_logon_guid"
+              "[event_data][ParentProcessGuid]" => "process_parent_guid"
+              "[event_data][ParentProcessId]" => "process_parent_id"
+              "[event_data][TerminalSessionId]" => "user_session_id"
+              "[event_data][FileVersion]" => "file_version"
+              "[event_data][Description]" => "file_description"
+              "[event_data][Product]" => "file_product"
+              "[event_data][Company]" => "file_company"
+            }
+            gsub => ["process_parent_guid","[{}]",""]
+            gsub => ["user_logon_guid","[{}]",""]
+          }
+        }
+        if [event_id] == 2 {
+          mutate {
+            add_field => { "action" => "filecreatetime" }
+            rename => {
+              "[event_data][TargetFileName]" => "file_name"
+            }
+          }
+        }
+        if [event_id] == 3 {
+          mutate {
+            add_field => { "action" => "networkconnect" }
+            rename => {
+              "[event_data][DestinationHostname]" => "dst_host_name"
+              "[event_data][DestinationIp]" => "dst_ip"
+              "[event_data][DestinationIsIpv6]" => "dst_is_ipv6"
+              "[event_data][DestinationPort]" => "dst_port"
+              "[event_data][DestinationPortName]" => "dst_port_name"
+              "[event_data][Initiated]" => "network_initiated"
+              "[event_data][Protocol]" => "network_protocol"
+              "[event_data][SourceHostname]" => "src_host_name"
+              "[event_data][SourceIp]" => "src_ip"
+              "[event_data][SourceIsIpv6]" => "src_is_ipv6"
+              "[event_data][SourcePort]" => "src_port"
+              "[event_data][SourcePortName]" => "src_port_name"
+            }
+          }
+          geoip {
+            source => "dst_ip"
+            remove_field => "[geoip][ip]"
+          }
+        }
+        if [event_id] == 4 {
+          mutate {
+            add_field => { "action" => "sysmonservicestatechanged" }
+            rename => {
+              "[event_data][State]" => "service_state"
+              "[event_data][Version]" => "sysmon_version"
+              "[event_data][SchemaVersion]" => "sysmon_schema_version"
+            }
+          }
+        }
+        if [event_id] == 6 {
+          mutate {
+            add_field => { "action" => "driverload" }
+            rename => {
+              "[event_data][ImageLoaded]" => "driver_loaded"
+              "[event_data][Signature]" => "driver_signature"
+              "[event_data][SignatureStatus]" => "driver_signature_status"
+              "[event_data][Signed]" => "driver_signed"
+            }
+          }
+        }
+        if [event_id] == 7 {
+          mutate {
+            add_field => { "action" => "imageload" }
+            rename => {
+              "[event_data][ImageLoaded]" => "module_loaded"
+              "[event_data][Signature]" => "module_signature"
+              "[event_data][SignatureStatus]" => "module_signature_status"
+              "[event_data][Signed]" => "module_signed"
+            }
+          }
+        }
+        if [event_id] == 8 {
+          mutate {
+            add_field => { "action" => "createremotethread" }
+            rename => {
+              "[event_data][NewThreadId]" => "thread_new_id"
+              "[event_data][StartAddress]" => "thread_start_address"
+              "[event_data][StartFunction]" => "thread_start_function"
+              "[event_data][StartModule]" => "thread_start_module"
+            }
+          }
+        }
+        if [event_id] == 9 {
+          mutate {
+            add_field => { "action" => "rawaccessread" }
+            rename => {
+              "[event_data][Device]" => "device_name"
+            }
+          }
+        }
+        if [event_id] == 10 {
+          mutate {
+            add_field => { "action" => "processaccess" }
+            rename => {
+              "[event_data][CallTrace]" => "process_call_trace"
+              "[event_data][GrantedAccess]" => "process_granted_access"
+              "[event_data][SourceThreadId]" => "thread_id"
+            }
+          }
+        }
+        if [event_id] == 11 {
+          mutate {
+            add_field => { "action" => "filecreate" }
+            rename => {
+              "[event_data][TargetFilename]" => "file_name"
+            }
+          }
+        }
+        if [event_id] == 12 or [event_id] == 13 or [event_id] == 14 {
+          mutate {
+            add_field => { "action" => "registryevent" }
+            rename => {
+              "[event_data][EventType]" => "event_type"
+              "[event_data][TargetObject]" => "registry_key_path"
+              "[event_data][Details]" => "registry_key_value"
+            }
+          }
+        }
+        if [event_id] == 15 {
+          mutate {
+            add_field => { "action" => "filecreatestreamhash" }
+            rename => {
+              "[event_data][TargetFilename]" => "file_name"
+              "[event_data][Hash]" => "hash"
+            }
+          }
+        }
+        if [event_id] == 16 {
+          kv {
+            source => "[event_data][ConfigurationFileHash]"
+            value_split => "="
+            prefix => "sysmon_config_hash_"
+            transform_key => "lowercase"
+          }
+          mutate {
+            add_field => { "action" => "sysmonconfigstatechanged" }
+            rename => {
+              "[event_data][State]" => "sysmon_configuration_state"
+              "[event_data][Configuration]" => "sysmon_configuration"
+            }
+          }
+        }
+        if [event_id] == 18 or [event_id] == 17 {
+          mutate {
+            add_field => { "action" => "pipeevent" }
+            rename => {
+              "[event_data][PipeName]" => "pipe_name"
+            }
+          }
+        }
+        if [event_id] == 19 or [event_id] == 20 or [event_id] == 21 {
+          mutate {
+            add_field => { "action" => "wmievent" }
+            rename => {
+              "[event_data][EventType]" => "wmi_event_type"
+              "[event_data][Operation]" => "wmi_operation"
+              "[event_data][EventNamespace]" => "wmi_namespace"
+              "[event_data][Name]" => "wmi_name"
+              "[event_data][Query]" => "wmi_query"
+              "[event_data][Type]" => "wmi_type"
+              "[event_data][Destination]" => "wmi_destination"
+            }
+          }
+        }
+        date {
+          timezone => "UTC"
+          match => [ "[event_data][UtcTime]", "YYYY-MM-dd HH:mm:ss.SSS" ]
+          tag_on_failure => [ "_sysmon_datefailure", "_dateparsefailure" ]
+        }
+        date {
+          timezone => "UTC"
+          match => [ "[event_data][CreationUtcTime]", "YYYY-MM-dd HH:mm:ss.SSS" ]
+          target => "@date_creation"
+          tag_on_failure => [ "_sysmon_datefailure", "_dateparsefailure" ]
+        }
+        date {
+          timezone => "UTC"
+          match => [ "[event_data][PreviousCreationUtcTime]", "YYYY-MM-dd HH:mm:ss.SSS" ]
+          target => "@date_creation_previous"
+          tag_on_failure => [ "_sysmon_datefailure", "_dateparsefailure" ]
+        }
+        mutate {
+          remove_field => "[event_data]"
+          remove_field => "message"
+          remove_field => "[event_data][Hashes]"
+          remove_field => "[event_data][ConfigurationFileHash]"
+          remove_field => "[event_data][UtcTime]"
+          remove_field => "[event_data][CreationUtcTime]"
+          remove_field => "[event_data][PreviousCreationUtcTime]"
+          remove_field => "[user]"
+          rename => { "[event_data][User]" => "user_account"}
+        }
+      }
+    }
+  32-helk-winevent-security-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if [log_name] == "Security"{
+        if [event_data][ProcessName] {
+          grok {
+            match => {
+              "[event_data][ProcessName]" => ".*\\%{GREEDYDATA:process_name}"
+            }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+        }
+        if [event_id] == 4611 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4611.md
+          mutate {
+            rename => {
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][LogonProcessName]" => "logon_process_name"
+            }
+          }
+        }
+        if [event_id] == 4616 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4616.md
+          mutate {
+            rename => {
+              "[event_data][NewTime]" => "@date_new_time"
+              "[event_data][PreviousTime]" => "@date_previous_time"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+            }
+          }
+        }
+        if [event_id] == 4624 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4624.md
+          mutate {
+            rename => {
+              "[event_data][SubjectUserSid]" => "user_reporter_sid"
+              "[event_data][SubjectUserName]" => "user_reporter_name"
+              "[event_data][SubjectDomainName]" => "user_reporter_domain"
+              "[event_data][SubjectLogonId]" => "reporter_logon_id"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][TargetLogonId]" => "user_logon_id"
+              "[event_data][LogonType]" => "logon_type"
+              "[event_data][RestrictedAdminMode]" => "logon_restricted_adminmode"
+              "[event_data][VirtualAccount]" => "logon_virtual_account"
+              "[event_data][ElevatedToken]" => "logon_elevated_token"
+              "[event_data][TargetUserName]" => "user_name"
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetLinkedLogonId]" => "user_linked_logon_id"
+              "[event_data][TargetOutboundDomainName]" => "user_network_account_domain"
+              "[event_data][TargetOutboundUserName]" => "user_network_account_name"
+              "[event_data][TargetUserSid]" => "user_sid"
+              "[event_data][ImpersonationLevel]" => "impersonation_level"
+              "[event_data][LogonGuid]" => "user_logon_guid"
+              "[event_data][WorkstationName]" => "src_host_name"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+              "[event_data][LogonProcessName]" => "logon_process_name"
+              "[event_data][AuthenticationPackageName]" => "logon_authentication_package_name"
+              "[event_data][TransmittedServices]" => "logon_transmitted_services"
+              "[event_data][LmPackageName]" => "logon_package_name"
+              "[event_data][KeyLength]" => "logon_key_length"
+            }
+          }
+          if "logon_elevated_token" == "Yes"{
+            mutate {
+              add_tag => ["elevated_logon"]
+            }
+          }
+        }
+        if [event_id] == 4625 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4625.md
+          mutate {
+            rename => {
+              "[event_data][SubjectUserSid]" => "user_reporter_sid"
+              "[event_data][SubjectUserName]" => "user_reporter_name"
+              "[event_data][SubjectDomainName]" => "user_reporter_domain"
+              "[event_data][SubjectLogonId]" => "reporter_logon_id"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][LogonType]" => "logon_type"
+              "[event_data][TargetUserName]" => "user_name"
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetUserSid]" => "user_sid"
+              "[event_data][WorkstationName]" => "src_host"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+              "[event_data][LogonProcessName]" => "logon_process_name"
+              "[event_data][AuthenticationPackageName]" => "logon_authentication_package_name"
+              "[event_data][TransmittedServices]" => "logon_transmitted_services"
+              "[event_data][LmPackageName]" => "logon_package_name"
+              "[event_data][KeyLength]" => "logon_key_length"
+              "[event_data][FailureReason]" => "logon_failure_reason"
+              "[event_data][Status]" => "logon_failure_status"
+              "[event_data][SubStatus]" => "logon_failure_substatus"
+            }
+          }
+          if "logon_elevated_token" == "Yes"{
+            mutate {
+              add_tag => ["elevated_logon"]
+            }
+          }
+        }
+        if [event_id] == 4627 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4627.md
+          mutate {
+            rename => {
+              "[event_data][SubjectUserSid]" => "user_reporter_sid"
+              "[event_data][SubjectUserName]" => "user_reporter_name"
+              "[event_data][SubjectDomainName]" => "user_reporter_domain"
+              "[event_data][SubjectLogonId]" => "reporter_logon_id"
+              "[event_data][TargetLogonId]" => "user_logon_id"
+              "[event_data][LogonType]" => "logon_type"
+              "[event_data][TargetUserName]" => "user_name"
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetUserSid]" => "user_sid"
+              "[event_data][GroupMembership]" => "user_group_membership"
+            }
+            remove_field => "[event_data][EventCountTotal]"
+            remove_field => "[event_data][EventIdx]"
+          }
+        }
+        if [event_id] == 4634 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4634.md
+          mutate {
+            rename => {
+              "[event_data][LogonType]" => "logon_type"
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetLogonId]" => "user_logon_id"
+              "[event_data][TargetUserName" => "user_name"
+              "[event_data][TargetUserSid]" => "user_sid"
+            }
+          }  
+        }
+        if [event_id] == 4647 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4647.md
+          mutate {
+            rename => {
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetLogonId]" => "user_logon_id"
+              "[event_data][TargetUserName" => "user_name"
+              "[event_data][TargetUserSid]" => "user_sid"
+            }
+          }
+        }
+        if [event_id] == 4648 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4648.md
+          mutate {
+            rename => {
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][LogonGuid]" => "user_logon_guid"
+              "[event_data][TargetUserName]" => "target_user_name"
+              "[event_data][TargetDomainName]" => "target_user_domain"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][TargetLogonId]" => "target_user_logon_id"
+              "[event_data][TargetServerName]" => "service_host_name"
+              "[event_data][TargetInfo]" => "service_host_info"
+              "[event_data][TargetLogonGuid]" => "target_user_logon_guid"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+            }
+          }
+        }
+        if [event_id] == 4656 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4656.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][AccessList]" => "object_access_list_requested"
+              "[event_data][AccessMask]" => "object_access_mask_requested"
+              "[event_data][AccessReason]" => "object_access_reason"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][PrivilegeList]" => "object_privilege_list"
+              "[event_data][TransactionId" => "object_access_transaction_id"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][ResourceAttributes]" => "object_resource_attributes"
+              "event_data][RestrictedSidCount]" => "object_restricted_sid_count"	
+            }
+          }
+        }
+        if [event_id] == 4657 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4657.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectValueName]" => "object_value_name"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][OperationType]" => "object_operation_type"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][OldValueType]" => "object_value_old_type"
+              "[event_data][OldValue]" => "object_value_old"
+              "[event_data][NewValueType]" => "object_value_new_type"
+              "[event_data][NewValue]" => "object_value_new"
+            }
+          }
+        }
+        if [event_id] == 4658 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4658.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][HandleId]" => "object_access_handle_id"
+            }
+          }
+        }
+        if [event_id] == 4661 or [event_id] == 4662 or [event_id] == 4663 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4661.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4662.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4663.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][Properties]" => "object_properties"
+              "[event_data][AccessMask]" => "object_access_mask_requested"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][AdditionalInfo2]" => "object_additional_info2"
+              "[event_data][OperationType]" => "object_operation_type"
+              "[event_data][AdditionalInfo]" => "object_additional_info"
+              "[event_data][AccessList]" => "object_access_list_requested"
+              "[event_data][ResourceAttributes]" => "object_resource_attributes"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][AccessReason]" => "object_access_reason"
+              "[event_data][PrivilegeList]" => "object_privilege_list"
+              "[event_data][TransactionId" => "object_access_transaction_id"
+              "event_data][RestrictedSidCount]" => "object_restricted_sid_count"	
+            }
+          }
+        }
+        if [event_id] == 4670 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4670.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][NewSd]" => "object_new_sddl"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][OldSd]" => "object_old_sddl"
+            }
+          }  
+        }
+        if [event_id] == 4672 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4672.md
+          mutate {
+            rename => {
+              "[event_data][PrivilegeList]" => "logon_privileges_assigned"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+            }
+          }  
+        }
+        if [event_id] == 4673 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4673.md
+          mutate {
+            rename => {
+              "[event_data][PrivilegeList]" => "service_privilege_list"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][Service]" => "service_name"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+            }
+          }  
+        }
+        if [event_id] == 4674 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4674.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][AccessMask]" => "object_access_mask_requested"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][PrivilegeList]" => "object_privilege_list"
+            }
+          }
+        }
+        if [event_id] == 4688 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4688.md
+          grok {
+            match => { "[event_data][NewProcessName]" => ".*\\%{GREEDYDATA:process_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+          grok {
+            match => { "[event_data][ParentProcessName]" => ".*\\%{GREEDYDATA:process_parent_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+          mutate {
+            rename => {
+              "[event_data][NewProcessId]" => "process_id"
+              "[event_data][NewProcessName]" => "process_path"
+              "[event_data][CommandLine]" => "command_line"
+              "[event_data][ParentProcessName]" => "process_parent_path"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_principal_domain"
+              "[event_data][TargetUserSid]" => "user_principal_sid"
+              "[event_data][TargetUserName]" => "user_principal_name"
+              "[event_data][TargetLogonId]" => "user_principal_id"
+              "[event_data][MandatoryLabel]" => "process_mandatory_level"
+              "[event_data][ProcessId]" => "process_parent_id"
+              "[event_data][TokenElevationType]" => "process_token_elevation_type"
+            }
+          }
+        }
+        if [event_id] == 4689 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4689.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][Status]" => "process_status"
+            }
+          }  
+        }
+        if [event_id] == 4690 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4690.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][SourceHandleId]" => "process_handle_id"
+              "[event_data][SourceProcessId]" => "process_id"
+              "[event_data][TargetHandleId]" => "target_process_handle_id"
+              "[event_data][TargetProcessId]" => "target_process_id"
+            }
+          }  
+        }
+        if [event_id] == 4697 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4697.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ServiceAccount]" => "service_account_name"
+              "[event_data][ServiceFileName]" => "service_image_path"
+              "[event_data][ServiceName]" => "service_name"
+              "[event_data][ServiceStartType]" => "service_start_type"
+              "[event_data][ServiceType]" => "service_type"
+            }
+          }  
+        }
+        if [event_id] == 4701 or [event_id] == 4702 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4701.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4702.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TaskContentNew]" => "task_new_content"
+              "[event_data][TaskName]" => "task_name"
+            }
+          }
+        }
+        if [event_id] == 4703 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4703.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_target_domain"
+              "[event_data][TargetLogonId]" => "user_target_logon_id"
+              "[event_data][TargetUserSid]" => "user_target_sid"
+              "[event_data][TargetUserName]" => "user_target_name"
+              "[event_data][DisabledPrivilegeList]" => "user_target_disabled_privilegelist"
+              "[event_data][EnabledPrivilegeList]" => "user_target_enabled_privilegelist"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+            }
+          }
+        }
+        if [event_id] == 4719 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4719.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][AuditPolicyChanges]" => "policy_changes"
+              "[event_data][CategoryId]" => "policy_category_id"
+              "[event_data][SubcategoryGuid]" => "policy_subcategory_guid"
+              "[event_data][SubcategoryId]" => "policy_subcategory_id"
+            }
+          }
+        }
+        if [event_id] == 4724 or [event_id] == 4725 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4724.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4725.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_target_domain"
+              "[event_data][TargetSid]" => "user_target_sid"
+              "[event_data][TargetUserName]" => "user_target_name"
+            }
+          }
+        }
+        if [event_id] == 4726 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4726.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_target_domain"
+              "[event_data][TargetSid]" => "user_target_sid"
+              "[event_data][TargetUserName]" => "user_target_name"
+              "[event_data][PrivilegeList]" => "user_privilege_list"
+            }
+          }
+        }
+        if [event_id] == 4728 or [event_id] == 4729 {
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "group_domain"
+              "[event_data][TargetSid]" => "group_sid"
+              "[event_data][TargetUserName]" => "group_name"
+              "[event_data][MemberName]" => "group_member_name"
+              "[event_data][MemberSid]" => "group_member_sid"
+              "[event_data][PrivilegeList]" => "group_privilege_list"
+            }
+          }
+        }
+        if [event_id] == 4732 or [event_id] == 4733 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4732.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4733.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "group_domain"
+              "[event_data][TargetSid]" => "group_sid"
+              "[event_data][TargetUserName]" => "group_name"
+              "[event_data][MemberName]" => "group_member_name"
+              "[event_data][MemberSid]" => "group_member_sid"
+              "[event_data][PrivilegeList]" => "group_privilege_list"
+            }
+          }
+        }
+        if [event_id] == 4738 or [event_id] == 4720 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4738.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4720.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_target_domain"
+              "[event_data][TargetSid]" => "user_target_sid"
+              "[event_data][TargetUserName]" => "user_target_name"
+              "[event_data][AccountExpires]" => "user_attribute_account_expires"
+              "[event_data][AllowedToDelegateTo]" => "user_attribute_allowed_todelegate"
+              "[event_data][DisplayName]" => "user_attribute_display_name"
+              "[event_data][Dummy]" => "user_attribute_dummy"
+              "[event_data][HomeDirectory]" => "user_attribute_home_directory"
+              "[event_data][HomePath]" => "user_attribute_home_path"
+              "[event_data][LogonHours]" => "user_attribute_logon_hours"
+              "[event_data][NewUacValue]" => "user_attribute_new_uacvalue"
+              "[event_data][OldUacValue]" => "user_attribute_old_uacvalue"
+              "[event_data][PasswordLastSet]" => "user_attribute_password_lastset"
+              "[event_data][PrimaryGroupId]" => "[user_attribute_primary_group_id"
+              "[event_data][PrivilegeList]" => "user_attribute_privilege_list"
+              "[event_data][ProfilePath]" => "user_attribute_profile_path"
+              "[event_data][SamAccountName]" => "user_attribute_samaccount_name"
+              "[event_data][ScriptPath]" => "user_attribute_script_path"
+              "[event_data][SidHistory]" => "user_attribute_sid_history"
+            }
+          }
+        }
+        if [event_id] == 4768 or [event_id] == 4769 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4768.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4769.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4771.md
+          mutate {
+            rename => {
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetUserName]" => "user_name"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+              "[event_data][PreAuthType]" => "service_ticket_preauthtype"
+              "[event_data][LogonGuid]" => "user_logon_guid"
+              "[event_data][ServiceName]" => "service_ticket_name"
+              "[event_data][ServiceSid]" => "service_ticket_id"
+              "[event_data][Status]" => "service_ticket_status"
+              "[event_data][TicketEncryptionType]" => "ticket_encryption_type"
+              "[event_data][TicketOptions]" => "ticket_options"
+              "[event_data][FailureCode]" => "ticket_failure_code"
+              "[event_data][TransmittedServices]" => "service_ticket_requested"	
+              "[event_data][TargetSid]" => "user_sid"       	
+            }
+          }  
+        }
+        if [event_id] == 4797 {
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "service_enumerated_domain"
+              "[event_data][TargetUserName]" => "service_enumerated_name"
+              "[event_data][Workstation]" => "host_name"
+            }
+          }  
+        }
+        if [event_id] == 4798 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4798.md
+          mutate {
+            rename => {
+              "[event_data][CallerProcessId]" => "process_id"
+              "[event_data][CallerProcessName]" => "process_path"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "user_domain_enumerated"
+              "[event_data][TargetSid]" => "user_sid_enumerated"
+              "[event_data][TargetUserName]" => "user_name_enumerated"
+            }
+          }  
+        }
+        if [event_id] == 4799 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4799.md
+          mutate {
+            rename => {
+              "[event_data][CallerProcessId]" => "process_id"
+              "[event_data][CallerProcessName]" => "process_path"
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][TargetDomainName]" => "group_domain_enumerated"
+              "[event_data][TargetSid]" => "group_sid_enumerated"
+              "[event_data][TargetUserName]" => "group_name_enumerated"
+            }
+          }  
+        }
+        if [event_id] == 4800 or [event_id] == 4801 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4800.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4801.md
+          mutate {
+            rename => {
+              
+              "[event_data][TargetDomainName]" => "user_domain"
+              "[event_data][TargetUserSid]" => "user_sid"
+              "[event_data][TargetUserName]" => "user_name"
+              "[event_data][TargetLogonId]" => "user_logon_id"
+              "[event_data][SessionId]" => "user_session_id"
+            }
+          }  
+        }
+        if [event_id] == 4907 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4907.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProcessName]" => "process_path"
+              "[event_data][HandleId]" => "object_access_handle_id"
+              "[event_data][NewSd]" => "object_new_sddl"
+              "[event_data][ObjectName]" => "object_name"
+              "[event_data][ObjectServer]" => "object_server"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][OldSd]" => "object_old_sddl"
+            }
+          }
+        }
+        if [event_id] == 4957 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-4957.md
+          mutate {
+            rename => {
+              "[event_data][RuleAttr]" => "firewall_rule_attr"
+              "[event_data][RuleId]" => "firewall_rule_id"
+              "[event_data][RuleName]" => "firewall_rule_name"
+            }
+          }
+        }
+        if [event_id] == 5058 or [event_id] == 5059 or [event_id] == 5061 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5058.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5059.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5061.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][AlgorithmName]" => "key_algorithm_name"
+              "[event_data][KeyName]" => "key_name"
+              "[event_data][KeyType]" => "key_type"
+              "[event_data][Operation]" => "key_operation"
+              "[event_data][ProviderName" => "key_provider_name"
+              "[event_data][ReturnCode]" => "key_return_code"
+            }
+          }
+        }
+        if [event_id] == 5136 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5136.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][OpCorrelationID]" => "dsoperation_correlation_id"
+              "[event_data][AppCorrelationID]" => "dsoperation_app_correlation_id"
+              "[event_data][DSName]" => "dsobject_domain"
+              "[event_data][DSType]" => "dsobject_domain_type"
+              "[event_data][ObjectDN]" => "dsobject_dn"
+              "[event_data][ObjectGUID]" => "dsobject_guid"
+              "[event_data][ObjectClass]" => "dsobject_class"
+              "[event_data][AttributeLDAPDisplayName]" => "dsobject_attribute_name"
+              "[event_data][AttributeSyntaxOID]" => "dsobject_attribute_type"
+              "[event_data][AttributeValue]" => "dsobject_attribute_value"
+              "[event_data][OperationType]" => "dsoperation_type"
+            }
+          }
+        }
+        if [event_id] == 5140 or [event_id] == 5145 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5140.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5145.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][AccessList]" => "object_access_list_requested"
+              "[event_data][AccessMask]" => "object_access_mask_requested"
+              "[event_data][AccessReason]" => "user_access_reason"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][RelativeTargetName]" => "share_relative_target_name"
+              "[event_data][ShareLocalPath]" => "share_local_path"
+              "[event_data][ShareName]" => "share_name"
+            }
+          }
+        }
+        if [event_id] == 5152 or [event_id] == 5154 or [event_id] == 5156 or [event_id] == 5158 or [event_id] == 5157 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5152.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5154.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5156.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5157.md
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5158.md
+          grok {
+            match => {
+              "[event_data][Application]" => ".*\\%{GREEDYDATA:process_name}"
+            }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+          mutate {
+            rename => {
+              "[event_data][Application]" => "process_path"
+              "[event_data][DestAddress]" => "dst_ip"
+              "[event_data][DestPort]" => "dst_port"
+              "[event_data][Direction]" => "network_direction"
+              "[event_data][FilterRTID]" => "network_filter_rtid"
+              "[event_data][LayerName]" => "network_layer_name"
+              "[event_data][LayerRTID]" => "network_layer_rtid"
+              "[event_data][ProcessID]" => "process_id"
+              "[event_data][Protocol]" => "network_protocol"
+              "[event_data][RemoteMachineID]" => "dst_host_name_id"
+              "[event_data][RemoteUserID]" => "dst_user_id"
+              "[event_data][SourceAddress]" => "src_ip"
+              "[event_data][SourcePort]" => "src_port"
+              "[event_data][ProcessId]" => "process_id"
+            }
+          }
+        }
+        if [event_id] == 5447 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-5447.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][AccessList]" => "object_access_list_requested"
+              "[event_data][AccessMask]" => "object_access_mask_requested"
+              "[event_data][AccessReason]" => "user_access_reason"
+              "[event_data][IpAddress]" => "src_ip"
+              "[event_data][IpPort]" => "src_port"
+              "[event_data][ObjectType]" => "object_type"
+              "[event_data][RelativeTargetName]" => "share_relative_target_name"
+              "[event_data][ShareLocalPath]" => "share_local_path"
+              "[event_data][ShareName]" => "share_name"
+              "[event_data][Action]" => "filtering_action"
+              "[event_data][CalloutKey]" => "filtering_callout_key"
+              "[event_data][CalloutName]" => "filtering_callout_name"
+              "[event_data][ChangeType]" => "filtering_change_type"
+              "[event_data][Conditions]" => "filtering_conditions"
+              "[event_data][FilterId]" => "filtering_id"
+              "[event_data][FilterKey]" => "filtering_key"
+              "[event_data][FilterName]" => "filtering_name"
+              "[event_data][FilterType]" => "filtering_type"
+              "[event_data][LayerId]" => "filtering_layer_id"
+              "[event_data][LayerKey]" => "filtering_layer_key"
+              "[event_data][LayerName]" => "filtering_layer_name"
+              "[event_data][ProcessId]" => "process_id"
+              "[event_data][ProviderKey]" => "filtering_provider_key"
+              "[event_data][ProviderName" => "filtering_provider_name"
+              "[event_data][UserName]" => "user_name"
+              "[event_data][UserSid]" => "user_sid"
+              "[event_data][Weight]" => "filtering_weight"
+            }
+          }
+        }
+        if [event_id] == 6416 {
+          # https://github.com/MicrosoftDocs/windows-itpro-docs/blob/master/windows/security/threat-protection/auditing/event-6416.md
+          mutate {
+            rename => {
+              "[event_data][SubjectDomainName]" => "user_domain"
+              "[event_data][SubjectLogonId]" => "user_logon_id"
+              "[event_data][SubjectUserName]" => "user_name"
+              "[event_data][SubjectUserSid]" => "user_sid"
+              "[event_data][ClassId]" => "device_class_id"
+              "[event_data][ClassName]" => "device_class_name"
+              "[event_data][CompatibleIds]" => "device_compatible_ids"
+              "[event_data][DeviceDescription]" => "device_description"
+              "[event_data][DeviceId]" => "device_id"
+              "[event_data][LocationInformation]" => "device_location_information"
+              "[event_data][VendorIds]" => "device_vendor_ids"	     	
+            }
+          }
+        }
+        mutate {
+          convert => {
+             "src_port" => "integer"
+             "dst_port" => "integer"
+          }
+          rename => {
+            "computer_name" => "host_name"
+          }
+          gsub => ["user_logon_guid","[{}]",""]
+          gsub => ["target_user_logon_guid","[{}]",""]
+        }
+        if [user_logon_id] {
+          mutate { gsub => [ "user_logon_id", "0x", "" ]}
+          ruby {
+            code => "event.set('user_logon_id', event.get('user_logon_id').to_s.hex)"
+            tag_on_exception =>  "_0591_rubyexception"
+          }
+        }
+        if [process_id] {
+          mutate { gsub => [ "process_id", "0x", "" ]}
+          ruby {
+            code => "event.set('process_id', event.get('process_id').to_s.hex)"
+            tag_on_exception =>  "_0591_rubyexception"
+          }
+        }
+        if [process_parent_id] {
+          mutate { gsub => [ "process_parent_id", "0x", "" ]}
+          ruby {
+            code => "event.set('process_parent_id', event.get('process_parent_id').to_s.hex)"
+            tag_on_exception =>  "_0591_rubyexception"
+          }
+        }
+        if [target_process_id] {
+          mutate { gsub => [ "target_process_id", "0x", "" ]}
+          ruby {
+            code => "event.set('target_process_id', event.get('target_process_id').to_s.hex)"
+            tag_on_exception =>  "_0591_rubyexception"
+          }
+        }
+      }  
+    }
+  33-helk-winevent-system-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if [log_name] == "System" {
+        if [event_id] == 7045 {
+          # https://cyberwardog.blogspot.com/2017/04/chronicles-of-threat-hunter-hunting-for_11.html
+          mutate {
+            rename => {
+              "[event_data][AccountName]" => "service_account_name"
+              "[event_data][ImagePath]" => "service_image_path"
+              "[event_data][ServiceName]" => "service_name"
+              "[event_data][ServiceType]" => "service_type"
+              "[event_data][StartType]" => "service_start_type"
+            }
+            add_tag => ["new_service"]
+            remove_field => ["message"]
+            remove_field => "host"
+            remove_field => "process_id"
+          }
+        }
+        if [event_id] == 16 {
+          mutate {
+            rename => {
+              "[event_data][HiveName]" => "hive_name"
+              "[event_data][HiveNameLength]" => "hive_name_length"
+              "[event_data][KeysUpdated]" => "hive_keys_updated"
+              "[event_data][DirtyPages]" => "hive_dirty_pages"
+            }
+          }
+        }
+        mutate {
+          rename => {
+            "[user][domain]" => "user_domain"
+            "[user][identifier]" => "user_sid"
+            "[user][name]" => "user_name"
+            "[user][type]" => "user_type"
+            "computer_name" => "host_name"
+          }
+        }
+      }
+    }
+    
+  34-helk-winevent-application-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if [log_name] == "Application"{
+        if [source_name] == "Microsoft-Windows-Security-SPP"{
+          if [event_id] == 16384 {
+            mutate {
+              rename => {
+                "[event_data][param1]" => "spp_restart_scheduled"
+                "[event_data][param2]" => "spp_restart_reason"
+              }
+            }
+          }
+        }
+        mutate {
+          rename => {
+            "computer_name" => "host_name"
+          }
+        }
+      }  
+    }
+  
+  35-helk-winevent-wmiactivity-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if [log_name] == "Microsoft-Windows-WMI-Activity/Operational"{
+        mutate {
+          rename => {
+            "[user][domain]" => "user_reporter_domain"
+            "[user][identifier]" => "user_reporter_sid"
+            "[user][name]" => "user_reporter_name"
+            "[user][type]" => "user_reporter_type"
+            "computer_name" => "host_name"
+          }
+        }
+        if [event_data][User] {  
+          grok {
+            match => { "[event_data][User]" => "%{GREEDYDATA:user_domain}\\%{GREEDYDATA:user_name}" }
+            tag_on_failure => [ "_grokparsefailure", "_parsefailure" ]
+          }
+        }
+        
+        # wevtutil gp "Microsoft-Windows-WMI-Activity" /ge:true /gm:true /f:XML
+
+        if [event_id] == 5857 {
+          #<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+          #  <System>
+          #    <Provider Name="Microsoft-Windows-WMI-Activity" Guid="{1418EF04-B0B4-4623-BF7E-D74AB47BBDAA}" />
+          #    <EventID>5857</EventID>
+          #    <Version>0</Version>
+          #    <Level>0</Level>
+          #    <Task>0</Task>
+          #    <Opcode>0</Opcode>
+          #    <Keywords>0x4000000000000000</Keywords>
+          #    <TimeCreated SystemTime="2018-02-05T03:56:37.904674000Z" />
+          #    <EventRecordID>4154</EventRecordID>
+          #    <Correlation />
+          #    <Execution ProcessID="4964" ThreadID="5016" />
+          #    <Channel>Microsoft-Windows-WMI-Activity/Operational</Channel>
+          #    <Computer>HELK-win</Computer>
+          #    <Security UserID="S-1-5-18" />
+          #  </System>
+          #  <UserData>
+          #    <Operation_StartedOperational xmlns="http://manifests.microsoft.com/win/2006/windows/WMI">
+          #      <ProviderName>VolumeChangeEvents</ProviderName>
+          #      <Code>0x0</Code>
+          #      <HostProcess>wmiprvse.exe</HostProcess>
+          #      <ProcessID>4964</ProcessID>
+          #      <ProviderPath>%systemroot%\system32\wbem\wmipcima.dll</ProviderPath>
+          #    </Operation_StartedOperational>
+          #  </UserData>
+          #</Event>
+
+          mutate {
+            rename => {
+              "[user_data][ProviderName]" => "wmi_provider"
+              "[user_data][Code]"         => "wmi_result_code"
+              "[user_data][HostProcess]"  => "process_name"
+              "[user_data][ProcessID]"    => "process_id"
+              "[user_data][ProviderPath]" => "wmi_provider_path"
+              "[user_data][xml_name]"     => "wmi_xml_operation"    # Should always be "Operation_StartedOperational"
+            }
+          }
+        }
+
+        if [event_id] == 5858 {
+          #<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+          #  <System>
+          #    <Provider Name="Microsoft-Windows-WMI-Activity" Guid="{1418EF04-B0B4-4623-BF7E-D74AB47BBDAA}" />
+          #    <EventID>5858</EventID>
+          #    <Version>0</Version>
+          #    <Level>2</Level>
+          #    <Task>0</Task>
+          #    <Opcode>0</Opcode>
+          #    <Keywords>0x4000000000000000</Keywords>
+          #    <TimeCreated SystemTime="2018-02-05T04:08:05.147338500Z" />
+          #    <EventRecordID>4157</EventRecordID>
+          #    <Correlation />
+          #    <Execution ProcessID="2616" ThreadID="3716" />
+          #    <Channel>Microsoft-Windows-WMI-Activity/Operational</Channel>
+          #    <Computer>HELK-win</Computer>
+          #    <Security UserID="S-1-5-18" />
+          #  </System>
+          #  <UserData>
+          #    <Operation_ClientFailure xmlns="http://manifests.microsoft.com/win/2006/windows/WMI">
+          #      <Id>{00000000-0000-0000-0000-000000000000}</Id>
+          #      <ClientMachine>HELK-WIN</ClientMachine>
+          #      <User>NT AUTHORITY\SYSTEM</User>
+          #      <ClientProcessId>3144</ClientProcessId>
+          #      <Component>Unknown</Component>
+          #      <Operation>Start IWbemServices::ExecQuery - root\cimv2 : SELECT * FROM Win32_PhysicalMemory</Operation>
+          #      <ResultCode>0x80041032</ResultCode>
+          #      <PossibleCause>Throttling Idle Tasks, refer to CIMOM regkey: ArbTaskMaxIdle</PossibleCause>
+          #    </Operation_ClientFailure>
+          #  </UserData>
+          #</Event>
+
+          mutate {
+            rename => {
+              "[user_data][Id]"              => "wmi_id"
+              "[user_data][ClientMachine]"   => "wmi_client_machine"
+              "[user_data][ClientProcessId]" => "process_id"
+              "[user_data][Component]"       => "wmi_component"
+              "[user_data][Operation]"       => "wmi_operation"
+              "[user_data][ResultCode]"      => "wmi_result_code"
+              "[user_data][PossibleCause]"   => "wmi_possible_cause"
+              "[user_data][xml_name]"        => "wmi_xml_operation"    # Should always be "Operation_ClientFailure"
+            }
+          }
+        }
+
+        if [event_id] == 5859 {
+          #<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+          #  <System>
+          #    <Provider Name="Microsoft-Windows-WMI-Activity" Guid="{1418EF04-B0B4-4623-BF7E-D74AB47BBDAA}" />
+          #    <EventID>5859</EventID>
+          #    <Version>0</Version>
+          #    <Level>0</Level>
+          #    <Task>0</Task>
+          #    <Opcode>0</Opcode>
+          #    <Keywords>0x4000000000000000</Keywords>
+          #    <TimeCreated SystemTime="2018-02-05T03:46:20.968689200Z" />
+          #    <EventRecordID>4131</EventRecordID>
+          #    <Correlation ActivityID="{BDB2DFE9-9E33-0000-6DEB-B2BD339ED301}" />
+          #    <Execution ProcessID="2616" ThreadID="4548" />
+          #    <Channel>Microsoft-Windows-WMI-Activity/Operational</Channel>
+          #    <Computer>HELK-win</Computer>
+          #    <Security UserID="S-1-5-18" />
+          #  </System>
+          #  <UserData>
+          #    <Operation_EssStarted xmlns="http://manifests.microsoft.com/win/2006/windows/WMI">
+          #      <NamespaceName>//./root/CIMV2</NamespaceName>
+          #      <Query>select * from MSFT_SCMEventLogEvent</Query>
+          #      <User>S-1-5-32-544</User>
+          #      <Processid>2616</Processid>
+          #      <Provider>SCM Event Provider</Provider>
+          #      <queryid>0</queryid>
+          #      <PossibleCause>Permanent</PossibleCause>
+          #    </Operation_EssStarted>
+          #  </UserData>
+          #</Event>
+
+          mutate {
+            rename => {
+              "[user_data][NamespaceName]" => "wmi_namespace"
+              "[user_data][Query]"         => "wmi_query"
+              "[user_data][Processid]"     => "process_id"
+              "[user_data][Provider]"      => "wmi_provider"
+              "[user_data][queryid]"       => "wmi_query_id"
+              "[user_data][PossibleCause]" => "wmi_possible_cause"
+              "[user_data][xml_name]"      => "wmi_xml_operation"    # Should always be "Operation_EssStarted"
+            }
+          }
+        }
+
+        if [event_id] == 5860 {
+          #<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+          #  <System>
+          #    <Provider Name="Microsoft-Windows-WMI-Activity" Guid="{1418EF04-B0B4-4623-BF7E-D74AB47BBDAA}" />
+          #    <EventID>5860</EventID>
+          #    <Version>0</Version>
+          #    <Level>0</Level>
+          #    <Task>0</Task>
+          #    <Opcode>0</Opcode>
+          #    <Keywords>0x4000000000000000</Keywords>
+          #    <TimeCreated SystemTime="2018-02-05T03:56:37.919072300Z" />
+          #    <EventRecordID>4155</EventRecordID>
+          #    <Correlation />
+          #    <Execution ProcessID="2616" ThreadID="7060" />
+          #    <Channel>Microsoft-Windows-WMI-Activity/Operational</Channel>
+          #    <Computer>HELK-win</Computer>
+          #    <Security UserID="S-1-5-18" />
+          #  </System>
+          #  <UserData>
+          #    <Operation_TemporaryEssStarted xmlns="http://manifests.microsoft.com/win/2006/windows/WMI">
+          #      <NamespaceName>root\cimv2</NamespaceName>
+          #      <Query>SELECT * FROM Win32_VolumeChangeEvent WHERE EventType = 2</Query>
+          #      <User>HELK-win\lee</User>
+          #      <Processid>8120</Processid>
+          #      <ClientMachine>HELK-WIN</ClientMachine>
+          #      <PossibleCause>Temporary</PossibleCause>
+          #    </Operation_TemporaryEssStarted>
+          #  </UserData>
+          #</Event>
+
+          mutate {
+            rename => {
+              "[user_data][NamespaceName]" => "wmi_namespace"
+              "[user_data][Query]"         => "wmi_query"
+              "[user_data][Processid]"     => "process_id"
+              "[user_data][ClientMachine]" => "wmi_client_machine"
+              "[user_data][PossibleCause]" => "wmi_possible_cause"
+              "[user_data][xml_name]"      => "wmi_xml_operation"    # Should always be "Operation_TemporaryEssStarted"
+            }
+          }
+        }
+
+        if [event_id] == 5861 {
+          #<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+          #  <System>
+          #    <Provider Name="Microsoft-Windows-WMI-Activity" Guid="{1418EF04-B0B4-4623-BF7E-D74AB47BBDAA}" />
+          #    <EventID>5861</EventID>
+          #    <Version>0</Version>
+          #    <Level>0</Level>
+          #    <Task>0</Task>
+          #    <Opcode>0</Opcode>
+          #    <Keywords>0x4000000000000000</Keywords>
+          #    <TimeCreated SystemTime="2018-02-05T04:01:49.202740500Z" />
+          #    <EventRecordID>4156</EventRecordID>
+          #    <Correlation />
+          #    <Execution ProcessID="2616" ThreadID="3884" />
+          #    <Channel>Microsoft-Windows-WMI-Activity/Operational</Channel>
+          #    <Computer>HELK-win</Computer>
+          #    <Security UserID="S-1-5-18" />
+          #  </System>
+          #  <UserData>
+          #    <Operation_ESStoConsumerBinding xmlns="http://manifests.microsoft.com/win/2006/windows/WMI">
+          #      <Namespace>//./root/subscription</Namespace>
+          #      <ESS>HumanInterfaceDevice</ESS>
+          #      <CONSUMER>NTEventLogEventConsumer="HIDConnectionEvent"</CONSUMER>
+          #      <PossibleCause>Binding EventFilter: instance of __EventFilter { CreatorSID = {1, 5, 0, 0, 0, 0, 0, 5, 21, 0, 0, 0, 159, 178, 61, 51, 160, 20, 53, 244, 9, 6, 127, 21, 244, 1, 0, 0}; EventNamespace = "root/cimv2"; Name = "HumanInterfaceDevice"; Query = "SELECT * FROM __InstanceCreationEvent WITHIN 5 WHERE TargetInstance ISA \"Win32_PointingDevice\" OR TargetInstance ISA \"Win32_KeyBoard\""; QueryLanguage = "WQL"; }; Perm. Consumer: instance of NTEventLogEventConsumer { Category = 0; CreatorSID = {1, 5, 0, 0, 0, 0, 0, 5, 21, 0, 0, 0, 159, 178, 61, 51, 160, 20, 53, 244, 9, 6, 127, 21, 244, 1, 0, 0}; EventID = 8; EventType = 2; InsertionStringTemplates = {"HID Device Connected", "Name: %TargetInstance.Name%", "Description: %TargetInstance.Description%", "Type: %TargetInstance.CreationClassName%", "PNPDeviceID: %TargetInstance.PNPDeviceID%"}; Name = "HIDConnectionEvent"; NumberOfInsertionStrings = 5; SourceName = "WSH"; };</PossibleCause>
+          #    </Operation_ESStoConsumerBinding>
+          #  </UserData>
+          #</Event>
+
+          mutate {
+            rename => {
+              "[user_data][Namespace]"     => "wmi_namespace"
+              "[user_data][ESS]"           => "wmi_event_subsystem"
+              "[user_data][CONSUMER]"      => "wmi_consumer"
+              "[user_data][PossibleCause]" => "wmi_possible_cause"
+              "[user_data][xml_name]"      => "wmi_xml_operation"    # Should always be "Operation_ESStoConsumerBinding"
+            }
+          }
+        }
+
+        # Common to all events
+        mutate {
+          convert => {
+            "process_id" => "integer"
+          }
+        }
+      }
+    }
+    
+  36-helk-winevent-security-schtasks-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+    
+    filter {
+      if [log_name] == "Security" {
+        # event_id 4698 for Created Scheduled Task
+        if [event_id] == 4698 {
+          mutate { add_field => { "z_logstash_pipeline" => "0511" } }
+          # Copy Message field incase we bork/mess it up
+          mutate { copy => { "Message" => "deleteme" } }
+          # #TONOTE: encoding is UTF-16
+          # Need to remove everything before "<Task version=" to get clean XML
+          mutate {
+            gsub => [ "deleteme", "A scheduled task was created\.\r\n\r\nSubject:\r\n\tSecurity ID:\t\t.*\r\n\tAccount Name:\t\t.*\r\n\tAccount Domain:\t\t.*\r\n\t.*\t\t.*\r\n\r\nTask Information:\r\n\tTask Name: \t\t\\.*\r\n\tTask Content: \t\t.*>\r\n<Task version=", "<Task version=" ]
+          }
+          xml {
+            source => "deleteme"
+            target => "ScheduledTask"
+            suppress_empty => true
+            force_array => false
+            force_content => true
+            remove_namespaces => true
+            store_xml => true
+            add_field => { "z_logstash_xml_success" => "true" }
+          }
+        # HASH without Registration Info
+        # The following are the only to tabs/things in a Scheduled Task that may have multiple entries
+        # So we want to make them into a list
+        #QnVpbHQgYnkgTmF0ZSBHdWFnZW50aSBAbmV1NXJvbg==
+        #TODO:probably use split plugin?
+        #TODO:Make Actions.* into list
+        #TODO:Make Triggers.* into list
+        #TODO:hunt if Registration Author is different than Prinicpal User :)  
+        #TODO:Hash
+        #TODO:lowercase ScheduledTask.Actions.Exec.WorkingDirectory AND ScheduledTask.Triggers.EventTrigger.Subscription.QueryList.Query.Path AND ScheduledTask.Triggers.EventTrigger.Subscription.QueryList.Query.Select.Path 
+          if [z_logstash_xml_success] {
+            mutate {
+              remove_field => [ "TaskContent", "Message", "deleteme", "[ScheduledTask][Settings]", "[ScheduledTask][xmlns]" ]
+            }
+          }
+          # Else move it to something else
+          else {
+            mutate {
+              add_field => { "z_logstash_xml_success" => "false" }
+              remove_field => [ "TaskContent", "deleteme", "ScheduledTask", "Message" ]
+            }
+          }
+        }
+      }
+    }
+    
+  36-helk-attack-filter.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    filter {
+      if "attack" in [tags]{
+        csv
+        {
+            skip_header => true
+            columns => [
+            'matrix','technique','technique_id','technique_description','mitigation','mitigation_description',
+            'group','group_id','group_aliases','group_description','software','software_id','software_description',
+            'software_labels','relationship_description','detectable_by_common_defenses','detectable_explanation',
+            'difficulty_for_adversary','difficulty_explanation','effective_permissions','network_requirements',
+            'remote_support','system_requirements','contributors','url','tactic','platform','data_sources',
+            'permissions_required','Validation'
+            ]
+        }
+      }
+    }
+    
+{{- end }}
+{{- if .Values.logstashConfig.features.bro.enabled }}
+  24-bro-filters.conf: |
+    filter {
+      if "bro" in [tags] {
+        json {
+          source => "message"
+        }
+        geoip {
+          source => "id.resp_h"
+          target => "resp_geoip"
+          add_field => [ "resp_location", "%{[resp_geoip][longitude]}" ]
+          add_field => [ "resp_location", "%{[resp_geoip][latitude]}"  ]
+        }
+        mutate {
+          convert => [ "resp_location", "float" ]
+          replace => { "type" => "bro" }
+          rename => { "id" => "bro_id" }
+          #need to rename the following because Elastic assumes they are objects and fails
+          rename => { "id.resp_p" => "bro_id_resp_p" }
+          rename => { "id.resp_h" => "bro_id_resp_h" }
+          rename => { "id.orig_p" => "bro_id_orig_p" }
+          rename => { "id.orig_h" => "bro_id_orig_h" }
         }
       }
     }
