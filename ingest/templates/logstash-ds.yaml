@@ -32,6 +32,11 @@ spec:
         - "+x"
         - "/scripts/logstash-init.sh"
         - "&&"
+        - "yum"
+        - "install"
+        - "-y"
+        - "git"
+        - "&&"
         - "/scripts/logstash-init.sh"
         volumeMounts:
         - mountPath: /attack-csv/

@@ -9,8 +9,7 @@ data:
   
     # Get mitre_attack.csv from HELK and copy it to the Logstash volume
     # https://github.com/Cyb3rWard0g/HELK
-    yum install -y git
     git clone https://github.com/Cyb3rWard0g/HELK.git
     cd HELK/helk-logstash/enrichments/cti/
-    cp mitre_attack.csv /attack-csv/
+    cp mitre_attack.csv /attack-csv
   
