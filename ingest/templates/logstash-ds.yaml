@@ -28,15 +28,6 @@ spec:
       - name: logstash-init
         image: centos
         command: 
-        - chmod
-        - "+x"
-        - "/scripts/logstash-init.sh"
-        - "&&"
-        - "yum"
-        - "install"
-        - "-y"
-        - "git"
-        - "&&"
         - "/scripts/logstash-init.sh"
         volumeMounts:
         - mountPath: /attack-csv/
