@@ -337,7 +337,18 @@ data:
     }
 {{- end }}
 {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
-  30-helk-winevent-powershell-filter.conf: |
+  30-helk-all-filter.conf: |
+    filter {
+      if [message] and "winlogbeat" in [tags] {
+        fingerprint {
+          source => "message"
+          target => "[@metadata][log_hash]"
+          method => "MURMUR3"
+          key => "Logstash"
+        }
+      }
+    }
+  31-helk-winevent-powershell-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     # Reference:
@@ -471,7 +482,7 @@ data:
         }
       }
     }
-  31-helk-winevent-sysmon-filter.conf: |
+  32-helk-winevent-sysmon-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
@@ -783,7 +794,7 @@ data:
         }
       }
     }
-  32-helk-winevent-security-filter.conf: |
+  33-helk-winevent-security-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
@@ -1634,7 +1645,7 @@ data:
         }
       }  
     }
-  33-helk-winevent-system-filter.conf: |
+  34-helk-winevent-system-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
@@ -1677,7 +1688,7 @@ data:
       }
     }
     
-  34-helk-winevent-application-filter.conf: |
+  35-helk-winevent-application-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
@@ -1700,7 +1711,7 @@ data:
       }  
     }
   
-  35-helk-winevent-wmiactivity-filter.conf: |
+  36-helk-winevent-wmiactivity-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
@@ -1944,7 +1955,7 @@ data:
       }
     }
     
-  36-helk-winevent-security-schtasks-filter.conf: |
+  37-helk-winevent-security-schtasks-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
     
     filter {
@@ -1995,7 +2006,7 @@ data:
       }
     }
     
-  36-helk-attack-filter.conf: |
+  38-helk-attack-filter.conf: |
     # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
 
     filter {
