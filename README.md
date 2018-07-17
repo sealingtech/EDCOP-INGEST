@@ -152,6 +152,8 @@ output.redis:
   timeout: 5
 ```
 
+**All winlogbeat filters, dashboards, templates, and logstash config are provided by [HELK](https://github.com/Cyb3rWard0g/HELK) and adapted for EDCOP. All Credit goes to Cyb3rWard0g for his amazing ELK stack work for windows log filtering.**
+
 #### Bro
 
 You can enable the Bro pipeline by setting ```enabled``` to ```true```, which allows Logstash to pull Bro logs from Redis using the key *bro*. 

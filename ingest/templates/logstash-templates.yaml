@@ -1,0 +1,214 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "ingest.fullname" . }}-logstash-templates
+data:
+  powershell-direct-template.json: |
+    {
+      "index_patterns" : "winlogbeat-endpoint-powershell-direct-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"},
+            "process_id":{"type":"integer"}
+          }
+        }
+      }
+    }
+  winevent-application-template.json: |
+    {
+      "index_patterns" : "winlogbeat-endpoint-winevent-application-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"},
+            "spp_restart_scheduled":{"type":"date"}
+          }
+        }
+      }
+    }
+  winevent-security-template.json: |
+    {
+      "index_patterns" : "logs-endpoint-winevent-security-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"},
+            "@date_new_time":{"type":"date"},
+            "@date_previous_time":{"type":"date"},
+            "process_id":{"type":"integer"},
+            "target_process_id":{"type":"integer"},
+            "process_parent_id":{"type":"integer"},
+            "user_session_id":{"type":"integer"},
+            "src_port":{"type":"integer"},
+            "dst_port":{"type":"integer"},
+            "version":{"type":"integer"}
+          }
+        }
+      }
+    }
+  winevent-sysmon-template.json: |
+    {
+      "index_patterns" : "logs-endpoint-winevent-sysmon-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"},
+            "@date_creation":{"type":"date"},
+            "@date_creation_previous":{"type":"date"},
+            "dst_port":{"type":"integer"},
+            "src_port":{"type":"integer"},
+            "event_id":{"type":"integer"},
+            "geoip":{
+              "properties":{
+                "dma_code":{"type":"integer"},
+                "latitude":{"type":"float"},
+                "location":{"type": "geo_point"},
+                "longitude":{"type":"float"}
+              }
+            },
+            "network_initiated":{"type":"boolean"},
+            "process_id":{"type":"integer"},
+            "thread_new_id":{"type":"integer"},
+            "module_signed":{"type":"boolean"},
+            "process_parent_id":{"type":"integer"},
+            "target_process_id":{"type":"integer"},
+            "user_session_id":{"type":"integer"},
+            "thread_id":{"type":"integer"},
+            "version":{"type":"integer"}
+          }
+        }
+      }
+    }
+  winevent-system-template.json: |
+    {
+      "index_patterns" : "logs-endpoint-winevent-system-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"}
+          }
+        }
+      }
+    }
+  winevent-wmiactivity-template.json: |
+    {
+      "index_patterns" : "logs-endpoint-winevent-wmiactivity-*",
+      "settings" : {
+        "index.refresh_interval": "5s"
+      },
+      "mappings":{
+        "doc":{
+          "dynamic_templates": [{
+            "strings":{
+              "match_mapping_type": "string",
+              "mapping": {
+                "type": "text",
+                "norms": false,
+                "fields": {
+                  "raw": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          }],
+          "properties":{
+            "@timestamp":{"type":"date"},
+            "process_id":{"type":"integer"}
+          }
+        }
+      }
+    }
+  

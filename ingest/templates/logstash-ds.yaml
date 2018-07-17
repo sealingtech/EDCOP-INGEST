@@ -23,6 +23,23 @@ spec:
         { "name": "{{ .Values.networks.overlay }}" }
       ]'
     spec:
+      {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+      initContainers:
+      - name: logstash-init
+        image: centos:
+        command: 
+        - chmod
+        - "+x"
+        - "/scripts/logstash-init.sh"
+        - "&&"
+        - "/scripts/logstash-init.sh"
+        volumeMounts:
+        - mountPath: /attack-csv/
+          name: mitre-attack-csv
+        - name: logstash-init
+          mountPath: /scripts/logstash-init.sh
+          subPath: logstash-init.sh
+      {{- end }}
       containers:
       - name: logstash
         image: {{ .Values.images.logstash }}
@@ -46,6 +63,14 @@ spec:
             name: logstash-config
           - mountPath: /usr/share/logstash/pipeline/
             name: logstash-pipelines
+          {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+          - mountPath: /usr/share/logstash/pipeline/
+            name: logstash-filters
+          - mountPath: /usr/share/logstash/output_templates/
+            name: logstash-templates
+          - mountPath: /usr/share/logstash/cti/
+            name: mitre-attack-csv
+          {{- end }}
       volumes:
       - name: logstash-config
         configMap:
@@ -54,6 +79,20 @@ spec:
         configMap:
           name: {{ template "ingest.fullname" . }}-logstash-pipelines
       restartPolicy: Always
+      {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+      - name: logstash-filters
+        configMap:
+          name: {{ template "ingest.fullname" . }}-logstash-filters
+      - name: logstash-templates
+        configMap:
+          name: {{ template "ingest.fullname" . }}-logstash-templates
+      - name: mitre-attack-csv
+        emptyDir:     
+          medium: "Memory"
+      - name: logstash-init-script
+        configMap:
+          name: {{ template "ingest.fullname" . }}-logstash-init-script
+      {{- end }}
       dnsPolicy: ClusterFirst
       nodeSelector:
         ingest: "true"

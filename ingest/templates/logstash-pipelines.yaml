@@ -2,9 +2,14 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "ingest.fullname" . }}-logstash-pipelines
-data:   
+data: 
+  50-debug.conf: |
+    # enables stdout for debugging
+    output {
+      stdout { codec => rubydebug }
+    }  
 {{- if .Values.logstashConfig.features.syslog.enabled }}
-  syslog.conf: |
+  01-syslog-input.conf: |
     input {
       tcp {
         port => 5144
@@ -16,89 +21,7 @@ data:
       }
     }
     
-    filter {
-      if [type] == "syslog" {
-        {{- if .Values.logstashConfig.features.syslog.filters.cisco_asa }}
-        # Cisco specific filters
-        if "%ASA-" in [message] {
-          mutate {
-            add_tag => [ "Firewall", "ASA" ]
-          }
-          grok {
-            match => ["message", "%{CISCO_TAGGED_SYSLOG} %{GREEDYDATA:cisco_message}"]   
-          }
-          if !("_grokparsefailure" in [tags]) {
-            mutate {
-              rename => ["cisco_message", "message"]
-              remove_field => ["timestamp"]
-            }
-          }
-          grok {
-            match => [
-              "message", "%{CISCOFW104001}",
-              "message", "%{CISCOFW104002}",
-              "message", "%{CISCOFW104003}",
-              "message", "%{CISCOFW104004}",
-              "message", "%{CISCOFW105003}",
-              "message", "%{CISCOFW105004}",
-              "message", "%{CISCOFW105005",
-              "message", "%{CISCOFW105008",
-              "message", "%{CISCOFW105009",
-              "message", "%{CISCOFW106001}",
-              "message", "%{CISCOFW106006_106007_106010}",
-              "message", "%{CISCOFW106014}",
-              "message", "%{CISCOFW106015}",
-              "message", "%{CISCOFW106021}",
-              "message", "%{CISCOFW106023}",
-              "message", "%{CISCOFW106100_2_3}",
-              "message", "%{CISCOFW106100}",
-              "message", "%{CISCOFW304001}",
-              "message", "%{CISCOFW110002}",
-              "message", "%{CISCOFW302010}",
-              "message", "%{CISCOFW302013_302014_302015_302016}",
-              "message", "%{CISCOFW302020_302021}",
-              "message", "%{CISCOFW305011}",
-              "message", "%{CISCOFW313001_313004_313008}",
-              "message", "%{CISCOFW313005}",
-              "message", "%{CISCOFW321001}",
-              "message", "%{CISCOFW402117}",
-              "message", "%{CISCOFW402119}",
-              "message", "%{CISCOFW419001}",
-              "message", "%{CISCOFW419002}",
-              "message", "%{CISCOFW500004}",
-              "message", "%{CISCOFW602303_602304}",
-              "message", "%{CISCOFW710001_710002_710003_710005_710006}",
-              "message", "%{CISCOFW713172}",
-              "message", "%{CISCOFW733100}"
-            ]
-          }    
-          geoip {
-            source => "src_ip"
-            target => "geoip"
-            add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
-            add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
-          }   
-          mutate {
-            convert => [ "[geoip][coordinates]", "float" ]
-          }       
-        }
-        {{- end }}   
-
-        # General syslog filtering
-        syslog_pri { }      # Severity level
-        date {
-          match => [ "syslog_timestamp", "MMM dd HH:mm:ss", "MMM  d HH:mm:ss", "MMM dd yyyy HH:mm:ss", "MMM  d yyyy HH:mm:ss" ]
-        }          
-      }
-    }
-    
-    # enables stdout for debugging
-    output {
-      if [type] == "syslog" {
-       stdout { codec => rubydebug }
-      }
-    }
-    
+  51-syslog-output.conf: |    
     output {
       if [type] == "syslog" {
         elasticsearch {
@@ -114,7 +37,7 @@ data:
     }
 {{- end }}
 {{- if .Values.logstashConfig.features.packetbeat.enabled }}
-  packetbeat.conf: |
+  02-packetbeat-input.conf: |
     input {
       redis {
         host => "ingest-service"
@@ -126,6 +49,8 @@ data:
         threads => {{ .Values.logstashConfig.features.packetbeat.pipeline.threads }}
       }
     }
+    
+  52-packetbeat-output.conf: |
     output {
       if "packetbeat" in [tags] {
         elasticsearch {
@@ -140,36 +65,8 @@ data:
       }
     }
 {{- end }}
-{{- if .Values.logstashConfig.features.winlogbeat.enabled }}
-  winlogbeat.conf: |
-    input {
-      redis {
-        host => "ingest-service"
-        key => "winlogbeat"
-        data_type => "list"
-        tags => ["winlogbeat"]
-        codec => json
-        batch_count => {{ .Values.logstashConfig.features.winlogbeat.pipeline.batchCount }}
-        threads => {{ .Values.logstashConfig.features.winlogbeat.pipeline.threads }}
-      }
-    }
-
-    output {
-      if "winlogbeat" in [tags] {
-        elasticsearch {
-          hosts => "data-service:9200"
-          manage_template => false
-          index => "winlogbeat-%{+YYYY.MM.dd}"
-          document_type => "event"
-          codec => json
-          #user => logstash_internal
-          #password => changeme
-        }
-      }
-    }
-{{- end }}
 {{- if .Values.logstashConfig.features.bro.enabled }}
-  bro.conf: |
+  03-bro-input.conf: |
     input {
       redis {
         host => "ingest-service"
@@ -181,30 +78,8 @@ data:
         threads => {{  .Values.logstashConfig.features.bro.pipeline.threads }}
       }
     }
-    filter {
-      if "bro" in [tags] {
-        json {
-          source => "message"
-        }
-        geoip {
-          source => "id.resp_h"
-          target => "resp_geoip"
-          add_field => [ "resp_location", "%{[resp_geoip][longitude]}" ]
-          add_field => [ "resp_location", "%{[resp_geoip][latitude]}"  ]
-        }
-        mutate {
-          convert => [ "resp_location", "float" ]
-          replace => { "type" => "bro" }
-          rename => { "id" => "bro_id" }
-          #need to rename the following because Elastic assumes they are objects and fails
-          rename => { "id.resp_p" => "bro_id_resp_p" }
-          rename => { "id.resp_h" => "bro_id_resp_h" }
-          rename => { "id.orig_p" => "bro_id_orig_p" }
-          rename => { "id.orig_h" => "bro_id_orig_h" }
-        }
-      }
-    }
     
+  53-bro-output.conf: |
     output {
       if "bro" in [tags] {
         elasticsearch {
@@ -220,7 +95,7 @@ data:
     }
 {{- end }}
 {{- if .Values.logstashConfig.features.suricata.enabled }}
-  suricata.conf: |
+  04-suricata-input.conf: |
     input {
       redis {
         host => "ingest-service"
@@ -233,6 +108,7 @@ data:
       }
     }
     
+  54-suricata-output.conf: |
     output {
       if "suricata" in [tags] {
         elasticsearch {
@@ -243,6 +119,136 @@ data:
           codec => json
           #user => logstash_internal
           #password => changeme
+        }
+      }
+    }
+{{- end }}
+{{- if .Values.logstashConfig.features.winlogbeat.enabled }}
+  05-winlogbeat-input.conf: |
+    input {
+      redis {
+        host => "ingest-service"
+        key => "winlogbeat"
+        data_type => "list"
+        tags => ["winlogbeat"]
+        codec => json
+        batch_count => {{ .Values.logstashConfig.features.winlogbeat.pipeline.batchCount }}
+        threads => {{ .Values.logstashConfig.features.winlogbeat.pipeline.threads }}
+      }
+    }
+  06-winlogbeat-helk-attack-input.conf: |
+    input {
+      file
+      {
+        path => "/usr/share/logstash/cti/mitre_attack.csv"
+        start_position => "beginning"
+        sincedb_path => "/dev/null"
+        tags => [ "attack" ]
+      }
+    }
+  55-winlogbeat-helk-sysmon-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if [log_name] == "Microsoft-Windows-Sysmon/Operational"{
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          index => "winlogbeat-endpoint-winevent-sysmon-%{+YYYY.MM.dd}"
+          template => "/usr/share/logstash/output_templates/winevent-sysmon-template.json"
+          template_name => "winlogbeat-endpoint-winevent-sysmon"
+          template_overwrite => true
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+    
+  56-winlogbeat-helk-winevent-security-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      # Added tags in if statement
+      if [log_name] == "Security" and "winlogbeat" in [tags] {
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          index => "winlogbeat-endpoint-winevent-security-%{+YYYY.MM.dd}"
+          template => "/usr/share/logstash/output_templates/winevent-security-template.json"
+          template_name => "winlogbeat-endpoint-winevent-security"
+          template_overwrite => true
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+
+  57-winlogbeat-helk-winevent-system-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if [log_name] == "System" and "winlogbeat" in [tags] {
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          index => "winlogbeat-endpoint-winevent-system-%{+YYYY.MM.dd}"
+          template => "/usr/share/logstash/output_templates/winevent-system-template.json"
+          template_name => "winlogbeat-endpoint-winevent-system"
+          template_overwrite => true
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+  
+  58-winlogbeat-helk-winevent-application-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if [log_name] == "Application" and "winlogbeat" in [tags] {
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          index => "winlogbeat-endpoint-winevent-application-%{+YYYY.MM.dd}"
+          template => "/usr/share/logstash/output_templates/winevent-application-template.json"
+          template_name => "winlogbeat-endpoint-winevent-application"
+          template_overwrite => true
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+    
+  59-winlogbeat-helk-winevent-powershell-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if [source_name] == "Microsoft-Windows-PowerShell" or [source_name] == "PowerShell"{
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          manage_template => false
+          index => "winlogbeat-endpoint-winevent-powershell-%{+YYYY.MM.dd}"
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+    
+  60-winlogbeat-helk-winevent-wmiactivity-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if [log_name] == "Microsoft-Windows-WMI-Activity/Operational"{
+        elasticsearch {
+          hosts => ["data-service:9200"]
+          index => "winlogbeat-endpoint-winevent-wmiactivity-%{+YYYY.MM.dd}"
+          template => "/usr/share/logstash/output_templates/winevent-wmiactivity-template.json"
+          template_name => "winlogbeat-endpoint-winevent-wmiactivity"
+          template_overwrite => true
+          document_id => "%{[@metadata][log_hash]}"
+        }
+      }
+    }
+    
+  61-winlogbeat-helk-attack-output.conf: |
+    # https://github.com/Cyb3rWard0g/HELK/tree/master/helk-logstash/pipeline
+
+    output {
+      if "attack" in [tags]{
+        elasticsearch {
+            hosts => ["data-service:9200"]
+            index => "mitre-attack-%{+YYYY.MM.dd}"
         }
       }
     }
