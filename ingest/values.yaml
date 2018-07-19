@@ -1,7 +1,7 @@
 # EDCOP Ingest Node Chart values
 images:
-  # Base image: docker.elastic.co/logstash/logstash:6.3.1 
-  logstash: docker.elastic.co/logstash/logstash:6.3.1
+  # Base image: docker.elastic.co/logstash/logstash:6.3.0
+  logstash: docker.elastic.co/logstash/logstash:6.3.0
   # HA Redis REQUIRES the following image:
   # Highly Availability Redis: quay.io/smile/redis:4.0.9r0
   # Regular Redis: redis:4.0.9
