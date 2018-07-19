@@ -13,19 +13,20 @@ spec:
       name: {{ template "ingest.name" . }}-dashboards-runner
       annotations:
         "helm.sh/hook": "pre-install"  # Run before all other services start
-  containers:
-  - name: dashboards-runner
-    image: miked235/elk-runner
-    imagePullPolicy: Always
-    env:
-    - name: KIBANA
-      value: "kibana-service:5601"
-    volumeMounts:
-    - name: dashboards
-      mountPath: /etc/dashboards
-  volumes:
-  - name: dashboards
-    configMap:
-      name: {{ template "ingest.fullname" . }}-dashboards
-  restartPolicy: OnFailure
+    spec:
+      containers:
+      - name: dashboards-runner
+        image: miked235/elk-runner
+        imagePullPolicy: Always
+        env:
+        - name: KIBANA
+          value: "kibana-service:5601"
+        volumeMounts:
+        - name: dashboards
+          mountPath: /etc/dashboards
+      volumes:
+      - name: dashboards
+        configMap:
+          name: {{ template "ingest.fullname" . }}-dashboards
+      restartPolicy: OnFailure
 {{- end -}}
