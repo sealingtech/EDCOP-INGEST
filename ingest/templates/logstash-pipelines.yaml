@@ -23,7 +23,84 @@ data:
       }
     }
     
+
   51-syslog-output.conf: |    
+    filter {
+      if [type] == "syslog" {
+        {{- if .Values.logstashConfig.features.syslog.filters.cisco_asa }}
+        # Cisco specific filters
+        if "%ASA-" in [message] {
+          mutate {
+            add_tag => [ "Firewall", "ASA" ]
+          }
+          grok {
+            match => ["message", "%{CISCO_TAGGED_SYSLOG} %{GREEDYDATA:cisco_message}"]   
+          }
+          if !("_grokparsefailure" in [tags]) {
+            mutate {
+              rename => ["cisco_message", "message"]
+              remove_field => ["timestamp"]
+            }
+          }
+          grok {
+            match => [
+              "message", "%{CISCOFW104001}",
+              "message", "%{CISCOFW104002}",
+              "message", "%{CISCOFW104003}",
+              "message", "%{CISCOFW104004}",
+              "message", "%{CISCOFW105003}",
+              "message", "%{CISCOFW105004}",
+              "message", "%{CISCOFW105005",
+              "message", "%{CISCOFW105008",
+              "message", "%{CISCOFW105009",
+              "message", "%{CISCOFW106001}",
+              "message", "%{CISCOFW106006_106007_106010}",
+              "message", "%{CISCOFW106014}",
+              "message", "%{CISCOFW106015}",
+              "message", "%{CISCOFW106021}",
+              "message", "%{CISCOFW106023}",
+              "message", "%{CISCOFW106100_2_3}",
+              "message", "%{CISCOFW106100}",
+              "message", "%{CISCOFW304001}",
+              "message", "%{CISCOFW110002}",
+              "message", "%{CISCOFW302010}",
+              "message", "%{CISCOFW302013_302014_302015_302016}",
+              "message", "%{CISCOFW302020_302021}",
+              "message", "%{CISCOFW305011}",
+              "message", "%{CISCOFW313001_313004_313008}",
+              "message", "%{CISCOFW313005}",
+              "message", "%{CISCOFW321001}",
+              "message", "%{CISCOFW402117}",
+              "message", "%{CISCOFW402119}",
+              "message", "%{CISCOFW419001}",
+              "message", "%{CISCOFW419002}",
+              "message", "%{CISCOFW500004}",
+              "message", "%{CISCOFW602303_602304}",
+              "message", "%{CISCOFW710001_710002_710003_710005_710006}",
+              "message", "%{CISCOFW713172}",
+              "message", "%{CISCOFW733100}"
+            ]
+          }    
+          geoip {
+            source => "src_ip"
+            target => "geoip"
+            add_field => [ "[geoip][coordinates]", "%{[geoip][longitude]}" ]
+            add_field => [ "[geoip][coordinates]", "%{[geoip][latitude]}"  ]
+          }   
+          mutate {
+            convert => [ "[geoip][coordinates]", "float" ]
+          }       
+        }
+        {{- end }}   
+
+        # General syslog filtering
+        syslog_pri { }      # Severity level
+        date {
+          match => [ "syslog_timestamp", "MMM dd HH:mm:ss", "MMM  d HH:mm:ss", "MMM dd yyyy HH:mm:ss", "MMM  d yyyy HH:mm:ss" ]
+        }          
+      }
+    }
+
     output {
       if [type] == "syslog" {
         elasticsearch {
