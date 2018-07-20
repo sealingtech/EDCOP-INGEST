@@ -1,3 +1,4 @@
+  {{- if .Values.logstashConfig.features.syslog.enabled -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,11 +9,6 @@ metadata:
     component: logstash
 spec:
   ports:
-  - name: tcp-5044
-    protocol: TCP
-    port: 5044
-    targetPort: 5044
-  {{- if .Values.logstashConfig.features.syslog.enabled }}
   - name: tcp
     protocol: TCP
     port: 5144
@@ -22,7 +18,7 @@ spec:
     port: 5144
     nodePort: 30144
   type: NodePort
-  {{- end }}
   selector:
     app: {{ template "ingest.name" . }}-logstash
     component: logstash
+  {{- end -}}
