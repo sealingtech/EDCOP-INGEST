@@ -178,7 +178,73 @@ logstashConfig:
 
 #### Custom Features
 
-If you need additional feature capabilities, you can add your own pipeline + configuration in the ```logstash-pipelines.yaml``` and ```logstash-config``` files. Afterwards, you can define your settings in the ```values.yaml``` so they're configurable in the future. 
+If you need additional feature capabilities, you can add your own filters, inputs, and/or outputs in the ```values.yaml``` file under ```logstashConfig.features.custom```. Please put all configuration inside of the brackets and it will be put inside of a custom pipeline file. 
+
+For example, lets look at a Logstash pipeline configuration that pulls from Redis, does minimal filtering, and outputs to Elasticsearch:
+
+```
+input {
+  redis {
+    host => "ingest-service"
+    key => "custom"
+    data_type => "list"
+    tags => ["custom"]
+    codec => json
+  }
+}
+filter {
+  if "custom" in [tags] {
+    date {
+      match => [ "timestamp" , "dd/MMM/yyyy:HH:mm:ss Z" ]
+    }
+  }
+}
+output {
+  if "custom" in [tags] {
+    elasticsearch {
+      hosts => "data-service:9200"
+      manage_template => false
+      index => "custom-%{+YYYY.MM.dd}"
+    }
+  }
+}
+```
+
+When using Redis and Elasticsearch within the EDCOP platform, their service names can be used when a host name is needed. Redis translates to ```ingest-service``` and Elasticseach translates to ```data-service```, with each application listening (internally) on their default ports. Keep in mind, any configuration you add to Logstash will be run against all logs it receives, meaning you should use tags or other unique identifiers to segregate parsing. 
+
+Now that we have a config we'd like to add to Logstash, we can put it in the ```values.yaml``` file like so:
+
+```
+logstashConfig:
+  features:
+    custom: {
+      input {
+        redis {
+          host => "ingest-service"
+          key => "custom"
+          data_type => "list"
+          tags => ["custom"]
+          codec => json
+        }
+      }
+      filter {
+        if "custom" in [tags] {
+          date {
+            match => [ "timestamp" , "dd/MMM/yyyy:HH:mm:ss Z" ]
+          }
+        }
+      }
+      output {
+        if "custom" in [tags] {
+          elasticsearch {
+            hosts => "data-service:9200"
+            manage_template => false
+            index => "custom-%{+YYYY.MM.dd}"
+          }
+        }
+      }
+    }
+```
 
 *You can also open a GitHub issue requesting we add a feature if it can be repeated across clusters easily. If you have developed a feature and would like to share it, please submit a merge request detailing what it is and how it works. Thanks!*
 
