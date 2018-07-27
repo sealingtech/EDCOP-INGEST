@@ -74,7 +74,7 @@ logstashConfig:
         threads: 2
         #Configures the batch count that Logstash will process at a time.
         batchCount: 250
-    # Custom features allow you to input logstash configuration code in the brackets
+    # Custom features allow you to input logstash configuration code in the space
     # below. Helm will put this config into the right space in the 
     # logstash-pipeline file. Be sure this code is indented properly! 
     # Please leave this space blank if you do not have any custom config

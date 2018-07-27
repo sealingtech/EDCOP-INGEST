@@ -178,7 +178,7 @@ logstashConfig:
 
 #### Custom Features
 
-If you need additional feature capabilities, you can add your own filters, inputs, and/or outputs in the ```values.yaml``` file under ```logstashConfig.features.custom```. Please put all configuration inside of the brackets and it will be put inside of a custom pipeline file. 
+If you need additional feature capabilities, you can add your own filters, inputs, and/or outputs in the ```values.yaml``` file under ```logstashConfig.features.custom```. Please put all configuration in the space below the ```custom: |``` line and it will be put inside of a custom pipeline file. 
 
 For example, lets look at a Logstash pipeline configuration that pulls from Redis, does minimal filtering, and outputs to Elasticsearch:
 
@@ -243,7 +243,6 @@ logstashConfig:
           }
         }
       }
-    }
 ```
 
 *You can also open a GitHub issue requesting we add a feature if it can be repeated across clusters easily. If you have developed a feature and would like to share it, please submit a merge request detailing what it is and how it works. Thanks!*
