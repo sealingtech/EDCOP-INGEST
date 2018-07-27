@@ -91,63 +91,9 @@ data:
     # Default values for ommitted settings are read from the `logstash.yml` file.
     # When declaring multiple pipelines, each MUST have its own `pipeline.id`.
     #
-    # Template of EDCOP pipelines:
-    #
-    #   # Be sure to add these settings into the values.yaml file!
-    #   - pipeline.id: $TOOL-NAME
-    #     pipeline.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineWorkers }}
-    #     pipeline.batch.size: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineBatchSize }}
-    #     pipeline.output.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineOutputWorkers }}
-    #     path.config: /usr/share/logstash/pipeline/$TOOL-NAME.conf
-    #    ...
-    #
     ###########################################################################
     
     ############################ Defined pipelines ############################
-    {{- if .Values.logstashConfig.features.syslog.enabled }}
-    # Syslog pipeline
-    #- pipeline.id: syslog
-    #  pipeline.workers: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineWorkers }}
-    #  pipeline.batch.size: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineBatchSize }}
-    #  pipeline.output.workers: {{ .Values.logstashConfig.features.syslog.pipeline.pipelineOutputWorkers }}
-    #  path.config: /usr/share/logstash/pipeline/syslog.conf
-    {{- end }}
-    
-    {{- if .Values.logstashConfig.features.packetbeat.enabled }}
-    # Packetbeat pipeline
-    #- pipeline.id: packetbeat
-    #  pipeline.workers: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineWorkers }}
-    #  pipeline.batch.size: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineBatchSize }}
-    #  pipeline.output.workers: {{ .Values.logstashConfig.features.packetbeat.pipeline.pipelineOutputWorkers }}
-    #  path.config: /usr/share/logstash/pipeline/packetbeat.conf
-    {{- end }}
-    
-    {{- if .Values.logstashConfig.features.winlogbeat.enabled }}
-    # Winlogbeat pipeline
-    #- pipeline.id: winlogbeat
-    #  pipeline.workers: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineWorkers }}
-    #  pipeline.batch.size: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineBatchSize }}
-    #  pipeline.output.workers: {{ .Values.logstashConfig.features.winlogbeat.pipeline.pipelineOutputWorkers }}
-    #  path.config: /usr/share/logstash/pipeline/winlogbeat.conf
-    {{- end }}
-    
-    {{- if .Values.logstashConfig.features.bro.enabled }}
-    # Bro pipeline
-    #- pipeline.id: bro
-    #  pipeline.workers: {{ .Values.logstashConfig.features.bro.pipeline.pipelineWorkers }}
-    #  pipeline.batch.size: {{ .Values.logstashConfig.features.bro.pipeline.pipelineBatchSize }}
-    #  pipeline.output.workers: {{ .Values.logstashConfig.features.bro.pipeline.pipelineOutputWorkers }}
-    #  path.config: /usr/share/logstash/pipeline/bro.conf
-    {{- end }}
-    
-    {{- if .Values.logstashConfig.features.suricata.enabled }}
-    # Suricata pipeline
-    #- pipeline.id: suricata
-    #  pipeline.workers: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineWorkers }}
-    #  pipeline.batch.size: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineBatchSize }}
-    #  pipeline.output.workers: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineOutputWorkers }}
-    #  path.config: /usr/share/logstash/pipeline/suricata.conf
-    {{- end }}
     
     #################################### Options ###################################
     #

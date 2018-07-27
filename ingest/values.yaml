@@ -29,17 +29,6 @@ logstashConfig:
       filters:
         # Cisco ASA devices
         cisco_asa: false
-      # Syslog pipeline
-      pipeline:
-        #Limits the number of threads that will be used by Logstash
-        threads: 2
-        #Configures the batch count that Logstash will process at a time.
-        batchCount: 250
-        #Sets the number of workers for pulling Redis events
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        #Sets the amount of events grabbed from Redis at one time.
-        pipelineBatchSize: 150
     packetbeat: 
       # Enables Logstash to ingest Packetbeat logs from Redis within the cluster
       # Point Packetbeat to 'ingest-service' using port 6379
@@ -51,11 +40,6 @@ logstashConfig:
         threads: 2
         # Configures the batch count that Logstash will process at a time.
         batchCount: 250
-        # Sets the number of workers for pulling Redis events
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        # Sets the amount of events grabbed from Redis at one time.
-        pipelineBatchSize: 150
     winlogbeat: 
       # Enables Logstash to ingest Winlogbeat logs from Redis
       # REQUIRES the use of externally available Redis
@@ -68,11 +52,6 @@ logstashConfig:
         threads: 2
         # Configures the batch count that Logstash will process at a time.
         batchCount: 250
-        # Sets the number of workers for pulling Redis events
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        # Sets the amount of events grabbed from Redis at one time.
-        pipelineBatchSize: 150
     bro: 
       # Enables Logstash to ingest Bro logs from Redis within the cluster
       # Point Bro's logs to 'ingest-service' using port 6379
@@ -84,11 +63,6 @@ logstashConfig:
         threads: 2
         # Configures the batch count that Logstash will process at a time.
         batchCount: 250
-        # Sets the number of workers for pulling Redis events
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        # Sets the amount of events grabbed from Redis at one time.
-        pipelineBatchSize: 150
     suricata:
       # Enables Logstash to ingest Suricata logs from Redis within the cluster
       # Point Suricata's logs to 'ingest-service' using port 6379
@@ -100,11 +74,6 @@ logstashConfig:
         threads: 2
         #Configures the batch count that Logstash will process at a time.
         batchCount: 250
-        # Sets the number of workers for pulling Redis events
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        # Sets the amount of events grabbed from Redis at one time.
-        pipelineBatchSize: 150
   resources:
     # Resources limit Logstash as a whole
     # Sets the initial and max JVM heap that will be allocated, generally these two values should be the same.

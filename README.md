@@ -80,7 +80,7 @@ pipeline:
 
 #### Syslog
 
-You can enable Syslog by setting ```enabled``` to ```true```, but remember that this exposes the specified port on ALL ingest nodes. This port must be within the default 30000 - 32767 Kubernetes NodePort range. 
+You can enable Syslog by setting ```enabled``` to ```true```, but remember that this exposes the specified port on ALL ingest nodes. This port must be within the default 30000 - 32767 Kubernetes NodePort range. Additionally, you can enable a number of different filters corresponding to different devices for log parsing and enrichment. 
 
 *Please make sure that this port is usable across all ingest nodes, otherwise you will have issues.*
 
@@ -90,12 +90,8 @@ logstashConfig:
     syslog:
       enabled: true
       port: 30144
-      pipeline:
-        threads: 2
-        batchCount: 250
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        pipelineBatchSize: 150
+      filters:
+        cisco_asa: true
 ``` 
 
 In order to send syslogs to your EDCOP cluster, you must forward them to the IP of one of your ingest nodes (preferably the master) while also specifying the port number. After entering the cluster, these logs will be loadbalanced across all Logstash instances. 
@@ -114,9 +110,6 @@ logstashConfig:
       pipeline:
         threads: 2
         batchCount: 250
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        pipelineBatchSize: 150
 ``` 
 
 #### Winlogbeat
@@ -131,9 +124,6 @@ logstashConfig:
       pipeline:
         threads: 2
         batchCount: 250
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        pipelineBatchSize: 150
 ``` 
 Before installing Winlogbeat, you will need Windows logs forwarded to a centralized logging location. To do this, please follow Microsoft's instructions available from these guides: https://blogs.technet.microsoft.com/jepayne/2015/11/23/monitoring-what-matters-windows-event-forwarding-for-everyone-even-if-you-already-have-a-siem/ and https://www.syspanda.com/index.php/2017/03/01/setting-up-windows-event-forwarder-server-wef-domain-part-13/
 
@@ -168,9 +158,6 @@ logstashConfig:
       pipeline:
         threads: 2
         batchCount: 250
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        pipelineBatchSize: 150
 ``` 
 
 #### Suricata
@@ -187,9 +174,6 @@ logstashConfig:
       pipeline:
         threads: 2
         batchCount: 250
-        pipelineWorkers: 2
-        pipelineOutputWorkers: 2
-        pipelineBatchSize: 150
 ``` 
 
 #### Custom Features
