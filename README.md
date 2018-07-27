@@ -217,7 +217,7 @@ Now that we have a config we'd like to add to Logstash, we can put it in the ```
 ```
 logstashConfig:
   features:
-    custom: {
+    custom: |
       input {
         redis {
           host => "ingest-service"

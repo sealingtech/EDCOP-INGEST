@@ -2131,6 +2131,6 @@ data:
     }
 {{- end }}
 {{- if .Values.logstashConfig.features.custom }}
-  custom.confg: |
-{{ toYaml .Values.logstashConfig.features.custom | indent 4 }}
+  custom.conf: |
+{{ tpl .Values.logstashConfig.features.custom . | indent 4 }}
 {{- end }}
