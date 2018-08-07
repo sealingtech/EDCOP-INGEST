@@ -18,6 +18,7 @@ spec:
     port: 5144
     nodePort: 30144
   type: NodePort
+  externalTrafficPolicy: Local
   selector:
     app: {{ template "ingest.name" . }}-logstash
     component: logstash
