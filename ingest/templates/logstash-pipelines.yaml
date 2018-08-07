@@ -2130,3 +2130,7 @@ data:
       }
     }
 {{- end }}
+{{- if .Values.logstashConfig.features.custom }}
+  custom.conf: |
+{{ tpl .Values.logstashConfig.features.custom . | indent 4 }}
+{{- end }}

@@ -91,16 +91,6 @@ data:
     # Default values for ommitted settings are read from the `logstash.yml` file.
     # When declaring multiple pipelines, each MUST have its own `pipeline.id`.
     #
-    # Template of EDCOP pipelines:
-    #
-    #   # Be sure to add these settings into the values.yaml file!
-    #   - pipeline.id: $TOOL-NAME
-    #     pipeline.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineWorkers }}
-    #     pipeline.batch.size: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineBatchSize }}
-    #     pipeline.output.workers: { { .Values.logstashConfig.features.$TOOL-NAME.pipeline.pipelineOutputWorkers }}
-    #     path.config: /usr/share/logstash/pipeline/$TOOL-NAME.conf
-    #    ...
-    #
     ###########################################################################
     
     ############################ Defined pipelines ############################
@@ -148,6 +138,7 @@ data:
     #  pipeline.output.workers: {{ .Values.logstashConfig.features.suricata.pipeline.pipelineOutputWorkers }}
     #  path.config: /usr/share/logstash/pipeline/suricata.conf
     {{- end }}
+
     
     #################################### Options ###################################
     #

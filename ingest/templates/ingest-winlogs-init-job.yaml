@@ -1,0 +1,32 @@
+{{- if .Values.logstashConfig.features.winlogbeat.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "ingest.fullname" . }}-dashboards-runner
+  labels:
+    app: {{ template "ingest.name" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  template:
+    metadata:
+      name: {{ template "ingest.name" . }}-dashboards-runner
+      annotations:
+        "helm.sh/hook": "pre-install"  # Run before all other services start
+    spec:
+      containers:
+      - name: dashboards-runner
+        image: miked235/elk-runner
+        imagePullPolicy: Always
+        env:
+        - name: KIBANA
+          value: "kibana-service:5601"
+        volumeMounts:
+        - name: dashboards
+          mountPath: /etc/dashboards
+      volumes:
+      - name: dashboards
+        configMap:
+          name: {{ template "ingest.fullname" . }}-dashboards
+      restartPolicy: OnFailure
+{{- end -}}
